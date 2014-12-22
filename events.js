@@ -1,7 +1,14 @@
+/*!
+ * Jiesa events api library v0.0.1
+ *
+ * Copyright 2014, 2015 K.F and other contributors
+ * Released under the MIT license
+ *
+ */
 (function(window, undefined) {
 
     // events.js
-    var _uid = 1,
+    var __uid = 1,
         docElem = document.documentElement,
         registry = {},
         customEventType = 'dataavailable',
@@ -71,154 +78,151 @@
     };
 
     function retrieveUid(obj, uid) {
-        return (obj._uid = obj._uid || uid || _uid++);
+        return (obj.__uid = obj.__uid || uid || __uid++);
     }
 
-    function retrieveEvents(element) {
-        var uid = retrieveUid(element);
+    function retrieveEvents(node) {
+        var uid = retrieveUid(node);
         return (registry[uid] = registry[uid] || {});
     }
 
-    function fixEvents(name, e, type, node, target, currentTarget) {
+    function fixEvents(name, evt, type, node, target, currentTarget) {
 
-        if (typeof name === 'number') {
-            var args = e['[[__node__]]'];
-            return args ? args[name] : void 0;
-        }
-
-        // Support: IE8
-        if (msie === 8) {
-            var docEl = node.ownerDocument.documentElement;
-
-            if (name === 'which') {
-                return e.keyCode;
+            if (typeof name === 'number') {
+                var args = evt['[[__node__]]'];
+                return args ? args[name] : void 0;
             }
 
-            if (name === 'button') {
-                var button = e.button;
-                // click: 1 === left; 2 === middle; 3 === right
-                return button & 1 ? 1 : (button & 2 ? 3 : (button & 4 ? 2 : 0));
+            // Support: IE8
+            if (msie === 8) {
+                var docEl = node.ownerDocument.documentElement;
+
+                if (name === 'which') {
+                    return evt.keyCode;
+                }
+
+                if (name === 'button') {
+                    var button = evt.button;
+                    // click: 1 === left; 2 === middle; 3 === right
+                    return button & 1 ? 1 : (button & 2 ? 3 : (button & 4 ? 2 : 0));
+                }
+
+                if (name === 'pageX') {
+                    return evt.clientX + docEl.scrollLeft - docEl.clientLeft;
+                }
+
+                if (name === 'pageY') {
+                    return evt.clientY + docEl.scrollTop - docEl.clientTop;
+                }
+
+                if (name === 'preventDefault') {
+                    return function() {
+                        return evt.returnValue = false;
+                    };
+                }
+
+                if (name === 'stopPropagation') {
+                    return function() {
+                        return evt.cancelBubble = true;
+                    };
+                }
+            }
+            if (name === 'type') {
+                return type;
+            }
+            if (name === 'defaultPrevented') {
+                return 'defaultPrevented' in evt ?
+                    evt.defaultPrevented :
+                    // Support: IE < 9, Android < 4.0
+                    evt.returnValue === false;
+            }
+            if (name === 'target') {
+                return target;
+            }
+            if (name === 'currentTarget') {
+                return currentTarget;
+            }
+            if (name === 'relatedTarget') {
+                return evt.relatedTarget || evt[(evt.toElement === node ? 'from' : 'to') + 'Element'];
             }
 
-            if (name === 'pageX') {
-                return e.clientX + docEl.scrollLeft - docEl.clientLeft;
-            }
+            var value = evt[name];
 
-            if (name === 'pageY') {
-                return e.clientY + docEl.scrollTop - docEl.clientTop;
-            }
-
-            if (name === 'preventDefault') {
+            if (typeof value === 'function') {
                 return function() {
-                    return e.returnValue = false;
+                    return value.apply(evt, arguments);
                 };
             }
 
-            if (name === 'stopPropagation') {
-                return function() {
-                    return e.cancelBubble = true;
-                };
-            }
+            return value;
         }
-        if (name === 'type') {
-            return type;
-        }
-        if (name === 'defaultPrevented') {
-            return 'defaultPrevented' in e ?
-                e.defaultPrevented :
-                // Support: IE < 9, Android < 4.0
-                e.returnValue === false;
-        }
-        if (name === 'target') {
-            return target;
-        }
-        if (name === 'currentTarget') {
-            return currentTarget;
-        }
-        if (name === 'relatedTarget') {
-            return e.relatedTarget || e[(e.toElement === node ? 'from' : 'to') + 'Element'];
-        }
-
-        var value = e[name];
-
-        if (typeof value === 'function') {
-            return function() {
-                return value.apply(e, arguments);
-            };
-        }
-
-        return value;
-    }
-                
         // The guard function for buang. It let you
         // call various functions safely with a context and arguments 
 
-        function magicGuard(context, fn, arg1, arg2) {
-            if (typeof fn === 'string') {
-                fn = context[fn];
-            }
-
-            try {
-                return fn.call(context, arg1, arg2);
-            } catch (err) {
-                window.setTimeout(function() {
-                    throw err;
-                }, 1);
-
-                return false;
-            }
+    function magicGuard(context, fn, arg1, arg2) {
+        if (typeof fn === 'string') {
+            fn = context[fn];
         }
+
+        try {
+            return fn.call(context, arg1, arg2);
+        } catch (err) {
+            window.setTimeout(function() {
+                throw err;
+            }, 1);
+
+            return false;
+        }
+    }
 
     function createEventHandler(type, selector, callback, props, node, once) {
 
-        var
-            hook = eventHooks[type],
+        var hook = eventHooks[type],
             matcher = selectormatcher(selector, node),
+            handler = function(evt) {
 
-         handler = function(e) {
+                evt = evt || window.event;
+                // early stop in case of default action
 
-            e = e || window.event;
-            // early stop in case of default action
-
-            if (createEventHandler.skip === type) {
-                return;
-            }
-
-            if (handler._type === customEventType && e.srcUrn !== type) {
-                return; // handle custom events in legacy IE
-            }
-            // srcElement can be null in legacy IE when target is document
-            var target = e.target || e.srcElement || node.ownerDocument.documentElement,
-                currentTarget = matcher ? matcher(target) : node,
-                args = props || [];
-
-            // early stop for late binding or when target doesn't match selector
-            if (!currentTarget) {
-                return;
-            }
-            // off callback even if it throws an exception later
-            if (once) {
-                _off(node, type, callback);
-            }
-
-            if (props) {
-                args = args.map(function(name) {
-                    return fixEvents(
-                        name, e, type, node, target, currentTarget);
-                });
-            } else {
-                args = Array.prototype.slice(e['[[__node__]]'] || [0], 1);
-            }
-
-            // prevent default if handler returns false
-            if (callback.apply(node, args) === false) {
-                if (msie === 8) {
-                    e.returnValue = false;
-                } else {
-                    e.preventDefault();
+                if (createEventHandler.skip === type) {
+                    return;
                 }
-            }
-        };
+
+                if (handler._type === customEventType && evt.srcUrn !== type) {
+                    return; // handle custom events in legacy IE
+                }
+                // srcElement can be null in legacy IE when target is document
+                var target = evt.target || evt.srcElement || node.ownerDocument.documentElement,
+                    currentTarget = matcher ? matcher(target) : node,
+                    args = props || [];
+
+                // early stop for late binding or when target doesn't match selector
+                if (!currentTarget) {
+                    return;
+                }
+                // off callback even if it throws an exception later
+                if (once) {
+                    _off(node, type, callback);
+                }
+
+                if (props) {
+                    args = args.map(function(name) {
+                        return fixEvents(
+                            name, evt, type, node, target, currentTarget);
+                    });
+                } else {
+                    args = Array.prototype.slice(e['[[__node__]]'] || [0], 1);
+                }
+
+                // prevent default if handler returns false
+                if (callback.apply(node, args) === false) {
+                    if (msie === 8) {
+                        evt.returnValue = false;
+                    } else {
+                        evt.preventDefault();
+                    }
+                }
+            };
 
         if (hook) {
             handler = hook(handler, type) || handler;
@@ -235,16 +239,14 @@
         return handler;
     }
 
-    function _on(el, type, selector, args, callback, once) {
-        var events = retrieveEvents(el),
+    function _on(node, type, selector, args, callback, once) {
+        var events = retrieveEvents(node),
             handlers = events[type] || (events[type] = {});
+
         if (!handlers) {
             handlers = events[type] = {};
-            if (el['on' + type]) {
-                handlers[0] = el['on' + type];
-            }
         }
-        // alert(type)
+
         if (typeof type === 'string') {
 
             if (typeof args === 'function') {
@@ -256,6 +258,7 @@
                 } else {
                     args = selector;
                     selector = null;
+
                 }
             }
 
@@ -272,47 +275,47 @@
             var uid = retrieveUid(callback, type);
 
             if (handlers[uid]) {
-                return el; //don't add same handler twice
+                return node; //don't add same handler twice
             }
 
-            var fn = createEventHandler(type, selector, callback, args, el, once);
+            var fn = createEventHandler(type, selector, callback, args, node, once);
 
             if (fn) {
                 if (msie === 8) {
-                    el.attachEvent('on' + (fn._type || type), fn);
+                    node.attachEvent('on' + (fn._type || type), fn);
                 } else {
-                    el.addEventListener(fn._type || type, fn, !!fn.capturing);
+                    node.addEventListener(fn._type || type, fn, !!fn.capturing);
                 }
             }
 
             handlers[uid] = fn;
-            fn._uid = uid;
-            return el;
+            fn.__uid = uid;
+            return node;
 
 
         } else if (typeof type === 'object') {
             if (isArray(type)) {
                 type.forEach(function(name) {
                     if (once) {
-                        _once(el, name, selector, args, callback);
+                        _once(node, name, selector, args, callback);
                     } else {
-                        _on(el, name, selector, args, callback);
+                        _on(node, name, selector, args, callback);
                     }
                 });
             } else {
                 Object.keys(type).forEach(function(name) {
                     if (once) {
-                        _once(el, name, type[name]);
+                        _once(node, name, type[name]);
                     } else {
-                        _on(el, name, type[name]);
+                        _on(node, name, type[name]);
                     }
                 });
             }
         }
     }
 
-    function _once(el, type, selector, args, callback) {
-        return _on(el, type, selector, args, callback, true);
+    function _once(node, type, selector, args, callback) {
+        return _on(node, type, selector, args, callback, true);
     }
 
     function _off(node, type, selector, callback) {
@@ -331,7 +334,7 @@
             selector = void 0;
         }
 
-        var handler = events[type][callback._uid],
+        var handler = events[type][callback.__uid],
             skip = type !== handler.type;
 
         skip = skip || selector && selector !== handler.selector;
@@ -354,9 +357,7 @@
 
         if (typeof type === 'string') {
 
-            var
-
-                hook = eventHooks[type],
+            var hook = eventHooks[type],
                 handler = {};
 
             if (hook) {
