@@ -7,10 +7,12 @@
  */
 (function(window, undefined) {
 
-    var __eventId = 1,
+    var
         docElem = document.documentElement,
-        registry = {},
         customEventType = 'ie8',
+
+        NODE = '[[__node__]]',
+        EVENT = '[[__event__]]',
 
         /**
          * @param {*} obj
@@ -153,35 +155,10 @@
         };
     }
 
-    /**
-     * Get Jiesa event id
-     *
-     * @param {Object} node The element to get Jiesa event id from
-     *
-     * @return {Number}
-     */
-
-    function getEventId(node) {
-        return node.__eventId || (node.__eventId = __eventId++);
-    }
-
-    /**
-     * Get Jiesa events
-     *
-     * @param {Object} node The element to get Jiesa events from
-     *
-     * @return {Number}
-     */
-
-    function getEvents(node) {
-        var uid = getEventId(node);
-        return (registry[uid] = registry[uid] || {});
-    }
-
     function fixEvents(name, evt, type, node, target, currentTarget) {
 
             if (typeof name === 'number') {
-                var args = evt['[[__node__]]'];
+                var args = evt[NODE];
                 return args ? args[name] : void 0;
             }
 
@@ -290,7 +267,10 @@
                 // srcElement can be null in legacy IE when target is document
                 var target = evt.target || evt.srcElement || node.ownerDocument.documentElement,
                     currentTarget = matcher ? matcher(target) : node,
-                    args = props || [];
+
+                    // Expose a few default events
+
+                    args = props || [selector ? 'currentTarget' : 'target', 'defaultPrevented'];
 
                 // return if the target doesn't match selector
                 if (!currentTarget) {
@@ -306,8 +286,6 @@
                         return fixEvents(
                             name, evt, type, node, target, currentTarget);
                     });
-                } else {
-                    args = Array.prototype.slice(evt['[[__node__]]'] || [0], 1);
                 }
 
                 // prevent default if handler returns false
@@ -341,13 +319,10 @@
      */
 
     function _on(node, type, selector, args, callback, once) {
-        var events = getEvents(node),
-            handlers = events[type] || (events[type] = {});
 
-        if (!handlers) {
-            handlers = events[type] = {};
+        if (!node[EVENT]) {
+            node[EVENT] = [];
         }
-
         if (typeof type === 'string') {
 
             if (isFunction(args)) {
@@ -372,25 +347,17 @@
                 return false;
             }
 
-            var uid = getEventId(callback);
+            var handler = createEventHandler(type, selector, callback, args, node, once);
 
-            if (handlers[uid]) {
-                return node; //don't add same handler twice
-            }
-
-            var fn = createEventHandler(type, selector, callback, args, node, once);
-
-            if (fn) {
+            if (handler) {
                 if (msie === 8) {
-                    node.attachEvent('on' + (fn._type || type), fn);
+                    node.attachEvent('on' + (handler._type || type), handler);
                 } else {
-                    node.addEventListener(fn._type || type, fn, !!fn.capturing);
+                    node.addEventListener(handler._type || type, handler, !!handler.capturing);
                 }
             }
 
-            handlers[uid] = fn;
-            fn.__eventId = uid;
-            return node;
+            node[EVENT].push(handler)
 
             // TODO: Mouseenter are not working here. FIX IT!
 
@@ -432,38 +399,33 @@
 
     function _off(node, type, selector, callback) {
 
-        var events = getEvents(node);
-
-        if (!events || !events[type]) {
-            return node;
-        }
-
-        if (!isString(type)) {
-            return false;
-        }
-
         if (callback === void 0 && selector !== void 0) {
             callback = selector;
             selector = void 0;
             // Stop here, if no callback
-        } else {
-            return;
         }
-        // Get the handler
-        var handler = events[type][callback.__eventId],
-            skip = type !== handler.type;
 
-        skip = skip || selector && selector !== handler.selector;
-        skip = skip || callback && callback !== handler.callback;
+        node[EVENT].forEach(function(handler, index, events) {
 
-        if (skip) return true;
+            var skip = type !== handler.type;
 
-        type = handler._type || handler.type;
-        if (msie === 8) {
-            node.detachEvent('on' + type, handler);
-        } else {
-            node.removeEventListener(type, handler, !!handler.capturing);
-        }
+            if (!callback) {
+                callback = handler.callback;
+            }
+            skip = skip || selector && selector !== handler.selector;
+            skip = skip || callback && callback !== handler.callback;
+
+            if (skip) {
+                return true;
+            }
+
+            type = handler._type || handler.type;
+            if (msie === 8) {
+                node.detachEvent('on' + type, handler);
+            } else {
+                node.removeEventListener(type, handler, !!handler.capturing);
+            }
+        });
         return this;
     }
 
@@ -490,7 +452,7 @@
         }
         if (msie === 8) {
             e = node.ownerDocument.createEventObject();
-            e['[[__node__]]'] = arguments;
+            e[NODE] = arguments;
             // handle custom events for legacy IE
             if (!('on' + eventType in node)) {
                 eventType = customEventType;
@@ -509,10 +471,10 @@
                     detail: detail,
                     bubbles: true
                 });
-                e['[[__node__]]'] = arguments;
+                e[NODE] = arguments;
             } else {
                 e = node.ownerDocument.createEvent('HTMLEvents');
-                e['[[__node__]]'] = arguments;
+                e[NODE] = arguments;
                 e.initEvent(eventType, true, true);
             }
 
