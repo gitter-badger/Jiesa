@@ -46,19 +46,32 @@ Jiesa.on()
 
 ```javascript 
 
-// event delegated events
+// delegated events
 Jiesa.on(element, 'click', '#test', handler);
 
 // Several event types
 Jiesa.on(element, ["focus", "blur"], handler);
 
-Jiesa.on(element, "click", "span", ["currentTarget"], function(span) {
-// <span> is the element was clicked
+Jiesa.on(element, "click", "span", ["currentTarget"], function(div) {
+// <div> is the element was clicked
 });
 
 // add  events using object literal
 
 Jiesa.on(element, { click: clickHandler, keyup: keyupHandler })
+
+// add  events using object literal and exposed events
+
+ var literal = {
+  click: function(div) { 
+  // <div> is the element was clicked 
+  },
+  mouseenter: function(div) { 
+  // <div> is the element that was hovered over
+  }
+
+  Jiesa.on(element, literal, ['currentTarget'])
+
 ```
 
 ##ONCE
