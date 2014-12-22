@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v0.0.1
+ * Jiesa events api library v 0.0.2a
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -8,10 +8,10 @@
 (function(window, undefined) {
 
     // events.js
-    var __uid = 1,
+    var __eventId = 1,
         docElem = document.documentElement,
         registry = {},
-        customEventType = 'dataavailable',
+        customEventType = 'ie8',
 
         // Support: IE8+
 
@@ -39,9 +39,35 @@
 
         supportMatchesSelector = rnative.test(matchesSelector);
 
+
+
+    /**
+     * Determines if a reference is a `String`.
+     *
+     * @param {*} value Reference to check.
+     * @returns {boolean} True if `value` is a `String`.
+     */
+    function isString(value) {
+        return typeof value === 'string';
+    }
+
+    /**
+     * Determines if a reference is a `Function`.
+     *
+     * @param {*} value Reference to check.
+     * @returns {boolean} True if `value` is a `Function`.
+     */
+
+    function isFunction(value) {
+        return typeof value === 'function';
+    }
+
+    /**
+     *  matchesSelector for matching delegated events
+     */
     function selectormatcher(selector, context) {
 
-        if (typeof selector !== 'string') {
+        if (!isString(selector)) {
             return null;
         }
         return function(node) {
@@ -75,14 +101,28 @@
 
             return res && node;
         };
-    };
-
-    function retrieveUid(obj, uid) {
-        return (obj.__uid = obj.__uid || uid || __uid++);
     }
 
-    function retrieveEvents(node) {
-        var uid = retrieveUid(node);
+    /**
+     * Get Jiesa event id
+     *
+     * @param {Object} node The element to get Jiesa event id from
+     *
+     * @return {Number}
+     */
+
+    function getEventId(node) {
+            return node.__eventId || (node.__eventId = __eventId++);
+        }
+        /**
+         * Get Jiesa events
+         *
+         * @param {Object} node The element to get Jiesa events from
+         *
+         * @return {Number}
+         */
+    function getEvents(node) {
+        var uid = getEventId(node);
         return (registry[uid] = registry[uid] || {});
     }
 
@@ -106,6 +146,7 @@
                     // click: 1 === left; 2 === middle; 3 === right
                     return button & 1 ? 1 : (button & 2 ? 3 : (button & 4 ? 2 : 0));
                 }
+
 
                 if (name === 'pageX') {
                     return evt.clientX + docEl.scrollLeft - docEl.clientLeft;
@@ -148,7 +189,7 @@
 
             var value = evt[name];
 
-            if (typeof value === 'function') {
+            if (isFunction(value)) {
                 return function() {
                     return value.apply(evt, arguments);
                 };
@@ -160,20 +201,23 @@
         // call various functions safely with a context and arguments 
 
     function magicGuard(context, fn, arg1, arg2) {
-        if (typeof fn === 'string') {
-            fn = context[fn];
-        }
+            if (isString(fn)) {
+                fn = context[fn];
+            }
 
-        try {
-            return fn.call(context, arg1, arg2);
-        } catch (err) {
-            window.setTimeout(function() {
-                throw err;
-            }, 1);
+            try {
+                return fn.call(context, arg1, arg2);
+            } catch (err) {
+                window.setTimeout(function() {
+                    throw err;
+                }, 1);
 
-            return false;
+                return false;
+            }
         }
-    }
+        /**
+         * Create event handler
+         */
 
     function createEventHandler(type, selector, callback, props, node, once) {
 
@@ -196,7 +240,7 @@
                     currentTarget = matcher ? matcher(target) : node,
                     args = props || [];
 
-                // early stop for late binding or when target doesn't match selector
+                // return if the target doesn't match selector
                 if (!currentTarget) {
                     return;
                 }
@@ -211,7 +255,7 @@
                             name, evt, type, node, target, currentTarget);
                     });
                 } else {
-                    args = Array.prototype.slice(e['[[__node__]]'] || [0], 1);
+                    args = Array.prototype.slice(evt['[[__node__]]'] || [0], 1);
                 }
 
                 // prevent default if handler returns false
@@ -239,8 +283,13 @@
         return handler;
     }
 
+    /**
+     * Add event to element.
+     * Using addEventListener or attachEvent (IE8)
+     */
+
     function _on(node, type, selector, args, callback, once) {
-        var events = retrieveEvents(node),
+        var events = getEvents(node),
             handlers = events[type] || (events[type] = {});
 
         if (!handlers) {
@@ -249,30 +298,29 @@
 
         if (typeof type === 'string') {
 
-            if (typeof args === 'function') {
+            if (isFunction(args)) {
 
                 callback = args;
 
-                if (typeof selector === 'string') {
+                if (isString(selector)) {
                     args = null;
                 } else {
                     args = selector;
                     selector = null;
-
                 }
             }
 
-            if (typeof selector === 'function') {
+            if (isFunction(selector)) {
                 callback = selector;
                 selector = null;
                 args = null;
             }
 
-            if (typeof callback !== 'function') {
+            if (!isFunction(callback)) {
                 return false;
             }
 
-            var uid = retrieveUid(callback, type);
+            var uid = getEventId(callback);
 
             if (handlers[uid]) {
                 return node; //don't add same handler twice
@@ -289,7 +337,7 @@
             }
 
             handlers[uid] = fn;
-            fn.__uid = uid;
+            fn.__eventId = uid;
             return node;
 
 
@@ -315,17 +363,23 @@
     }
 
     function _once(node, type, selector, args, callback) {
-        return _on(node, type, selector, args, callback, true);
+        return _on(node, type, selector, args, callback, 1);
     }
+
+    /**
+     * Remove event to element.
+     * Using removeEventListener or detachEvent (IE8)
+     */
 
     function _off(node, type, selector, callback) {
 
-        var events = retrieveEvents(node);
+        var events = getEvents(node);
+
         if (!events || !events[type]) {
             return node;
         }
 
-        if (typeof type !== 'string') {
+        if (!isString(type)) {
             return false;
         }
 
@@ -334,7 +388,7 @@
             selector = void 0;
         }
 
-        var handler = events[type][callback.__uid],
+        var handler = events[type][callback.__eventId],
             skip = type !== handler.type;
 
         skip = skip || selector && selector !== handler.selector;
@@ -351,11 +405,15 @@
         return this;
     }
 
-    function _trigger(node, type) {
+    /**
+     * Fire specific event for element collection
+     */
+
+    function _fire(node, type) {
 
         var e, eventType, canContinue;
 
-        if (typeof type === 'string') {
+        if (isString(type)) {
 
             var hook = eventHooks[type],
                 handler = {};
@@ -380,7 +438,7 @@
                 e.srcUrn = type;
             }
 
-            node.fireEvent("on" + eventType, e);
+            node.fireEvent('on' + eventType, e);
 
             canContinue = e.returnValue !== false;
         } else {
@@ -427,7 +485,7 @@
             on: _on,
             once: _once,
             off: _off,
-            trigger: _trigger,
+            trigger: _fire,
             noConflict: function() {
                 if (window.Jiesa === Jiesa) {
                     window.Jiesa = _Jiesa;
