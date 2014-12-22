@@ -60,8 +60,7 @@ Jiesa.on(element, "click", "span", ["currentTarget"], function(div) {
 
 Jiesa.on(element, { click: clickHandler, keyup: keyupHandler })
 
-// add  events using object literal and exposed events
-
+// add  events using object literal and exposed event types
 
   Jiesa.on(element,  {
   click: function(div) { 
@@ -72,13 +71,23 @@ Jiesa.on(element, { click: clickHandler, keyup: keyupHandler })
   }, ['currentTarget'])
 
 
+// add delegated events using object literal and exposed event types
+
+  Jiesa.on(element,  {
+  click: function(div) { 
+  // <div> is the element was clicked 
+  },
+  mouseover: function(div) { 
+  // <div> is the element that was hovered over
+  }, '#test', ['currentTarget'])
+
 ```
 
 ##ONCE
 
 **Arguments**
 
-*Jiesa.once()* is an alias for *Jiesa.on()* except that the handler will fire once before being removed.
+*Jiesa.once()* is an alias for *Jiesa.on()* except that the handler will fire once before being removed. Note that each event will be executed once if you have two different events on same elements ( e.g. **mouseover** and **click**)
 
 * element / object (*DOM Element or Object*) - an HTML DOM element
 * type(s) (*String|Array*) - an event (or multiple events, space separated) to listen to with optional selector
