@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.3b
+ * Jiesa events api library v 0.0.4a
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -10,6 +10,10 @@
     var
         docElem = document.documentElement,
         customEventType = 'ie8',
+
+        /**
+         * Short-hands
+         */
 
         NODE = '[[__node__]]',
         EVENT = '[[__event__]]',
@@ -44,42 +48,9 @@
 
         rnative = /^[^{]+\{\s*\[native \w/,
 
+        // Check if matchesSelector are supported by the browser
+
         supportMatchesSelector = rnative.test(matchesSelector);
-
-    // requestAnimationFrame with polyfill for Internet Explorer 8 (rAF)
-    //______
-
-    var
-        top,
-        raf = window.requestAnimationFrame,
-        caf = window.cancelAnimationFrame || window.cancelRequestAnimationFrame;
-
-    // Test if we are within a foreign domain. Use raf from the top if possible.
-
-    try {
-        // Accessing .name will throw SecurityError within a foreign domain.
-        window.top.name;
-        top = window.top;
-    } catch (e) {
-        top = window;
-    }
-
-    if (!raf) {
-
-        // requestAnimationFrame
-
-        raf = top.requestAnimationFrame ||
-            top.webkitRequestAnimationFrame ||
-            top.mozRequestAnimationFrame ||
-            top.msRequestAnimationFrame;
-
-        // cancelAnimationFrame
-        caf = top.CancelAnimationFrame ||
-            top.webkitCancelAnimationFrame ||
-            top.webkitCancelRequestAnimationFrame ||
-            top.mozCancelAnimationFrame ||
-            top.msCancelAnimationFrame;
-    }
 
     /**
      * Determines if a reference is a `String`.
@@ -87,6 +58,7 @@
      * @param {*} value Reference to check.
      * @returns {boolean} True if `value` is a `String`.
      */
+
     function isString(value) {
         return typeof value === 'string';
     }
@@ -176,7 +148,6 @@
                     return button & 1 ? 1 : (button & 2 ? 3 : (button & 4 ? 2 : 0));
                 }
 
-
                 if (name === 'pageX') {
                     return evt.clientX + docEl.scrollLeft - docEl.clientLeft;
                 }
@@ -262,9 +233,9 @@
                 }
 
                 if (handler._type === customEventType && evt.srcUrn !== type) {
-                    return; // handle custom events in legacy IE
+                    return;
                 }
-                // srcElement can be null in legacy IE when target is document
+                // srcElement can be null in IE8 when target is document
                 var target = evt.target || evt.srcElement || node.ownerDocument.documentElement,
                     currentTarget = matcher ? matcher(target) : node,
 
@@ -353,7 +324,7 @@
                 if (msie === 8) {
                     node.attachEvent('on' + (handler._type || type), handler);
                 } else {
-                    node.addEventListener(handler._type || type, handler, !!handler.capturing);
+                    node.addEventListener(handler._type || type, handler, !!handler.bubbling);
                 }
             }
 
@@ -402,7 +373,6 @@
         if (callback === void 0 && selector !== void 0) {
             callback = selector;
             selector = void 0;
-            // Stop here, if no callback
         }
 
         node[EVENT].forEach(function(handler, index, events) {
@@ -423,7 +393,7 @@
             if (msie === 8) {
                 node.detachEvent('on' + type, handler);
             } else {
-                node.removeEventListener(type, handler, !!handler.capturing);
+                node.removeEventListener(type, handler, !!handler.bubbling);
             }
         });
         return this;
@@ -483,6 +453,7 @@
 
         // call native function to trigger default behavior
         if (canContinue && node[type]) {
+
             // prevent re-triggering of the current event
             createEventHandler.skip = type;
 
@@ -506,12 +477,12 @@
     } else {
         // firefox doesn't support focusin/focusout events
         eventHooks.focus = eventHooks.blur = function(handler) {
-            handler.capturing = true;
+            handler.bubbling = true;
         };
     }
     if (document.createElement('input').validity) {
         eventHooks.invalid = function(handler) {
-            handler.capturing = true;
+            handler.bubbling = true;
         };
     }
 
