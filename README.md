@@ -19,23 +19,6 @@ Jiesa.on(element, 'click', '#test', function () {
 });
 
 ```
-**Note!** **Jiesa** are not returning events the normal way:
-
-```javascript
- var callback = function (e) {
- // events
-  console.log(e);
-});
-```
-This is done to gain better performance. With Jiesa you do:
-
-```javascript
- 
- Jiesa.on(element, "click", ["currentTarget"], function(span) {
-  // <span> is the element that was clicked
-});
-
-```
 
 #API
 
