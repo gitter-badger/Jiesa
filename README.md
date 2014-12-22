@@ -1,6 +1,6 @@
 # Jiesa
 
-Jiesa is a lightning fast event manager using the newest technology. It's designed for desktop, mobile, and touch-based browsers. 
+Jiesa is a lightning fast event manager using the newest technology. It's designed for desktop, mobile, and touch-based browsers. **requestAnimationFrame** are used for **scroll** and **mousemove** events.
 
 As a start,- it works like this:
 
@@ -26,8 +26,11 @@ Jiesa.on(element, 'click', '#test', function () {
 * Jiesa.one()
 * Jiesa.off()
 * Jiesa.fire()
+* Jiesa.raf()
+* Jiesa.caf()
+* Jiesa.noConflict)
 
-##ON
+##On
 
 Attach event listeners to both elements and objects:
 
@@ -83,7 +86,7 @@ Jiesa.on(element, { click: clickHandler, keyup: keyupHandler })
 
 ```
 
-##ONCE
+##Once
 
 **Arguments**
 
@@ -104,7 +107,7 @@ Jiesa.once(element, 'click', handler);
 
 ```
 
-##OFF
+##Off
 
 **Arguments**
 
@@ -157,8 +160,12 @@ Triggers an event of specific type with optional extra arguments
 
 Jiesa.fire(element, 'click');
 
-
 ```
+#raf
+**requestAnimationFrame** with polyfill for **IE8**. **rAF** are used for **mouseover** and **scroll** events.
+ 
+#caf
+**CancelAnimationFrame** with polyfill for **IE8**.
 
 #Browser support
 
