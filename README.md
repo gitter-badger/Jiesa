@@ -149,8 +149,6 @@ Triggers an event of specific type with optional extra arguments
 
 **Arguments**
 
-*Jiesa.off()* unbind an event from the element. This is how you get rid of handlers once you no longer want them active. 
-
 * element / object (*DOM Element or Object*) - an HTML DOM element
 * type (*String*) - an event (or multiple events, space separated) to trigger
 * arg (*Objectl*) - optional repeatable extra arguments to pass into each event handler
@@ -163,6 +161,7 @@ Triggers an event of specific type with optional extra arguments
 
 Jiesa.fire(element, 'click');
 
+Jiesa.fire(element, "jiesa:event", {a: "b"}, 123); // fire "jiesa:event" with arguments
 ```
 
 #Browser support
