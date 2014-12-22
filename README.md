@@ -19,9 +19,7 @@ Jiesa.on(element, 'click', '#test', function () {
 });
 
 ```
-**Note!** matchesSelector with fallback to querySelectorAll are used for delegated events.
-
-**Jiesa** are not returning events the normal way:
+**Note!** **Jiesa** are not returning events the normal way:
 
 ```javascript
  var callback = function (e) {
