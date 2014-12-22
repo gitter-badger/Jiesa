@@ -488,14 +488,6 @@
      * Using removeEventListener or detachEvent (IE8)
      */
 
-    /**
-     * Unbind a DOM event from the context
-     * @memberOf DOMNode.prototype
-     * @param  {String} type event type
-     * @param  {DOMNode#eventCallback} [callback]  event handler
-     * @return {DOMNode} current context
-     */
-
     function _off(node, type, selector, callback) {
 
         var events = getEvents(node);
