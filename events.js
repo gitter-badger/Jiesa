@@ -471,7 +471,7 @@
      * Fire specific event for element collection
      */
 
-    function _fire(node, type) {
+    function _fire(node, type, detail) {
 
         var e, eventType, canContinue;
 
@@ -504,9 +504,18 @@
 
             canContinue = e.returnValue !== false;
         } else {
-            e = node.ownerDocument.createEvent('HTMLEvents');
-            e['[[__node__]]'] = arguments;
-            e.initEvent(eventType, true, true);
+            if (~type.indexOf(':')) {
+                e = new CustomEvent(eventType, {
+                    detail: detail,
+                    bubbles: true
+                });
+                e['[[__node__]]'] = arguments;
+            } else {
+                e = node.ownerDocument.createEvent('HTMLEvents');
+                e['[[__node__]]'] = arguments;
+                e.initEvent(eventType, true, true);
+            }
+
             canContinue = node.dispatchEvent(e);
         }
 
@@ -549,7 +558,7 @@
             on: _on,
             once: _once,
             off: _off,
-            trigger: _fire,
+            fire: _fire,
             eventHooks: eventHooks,
             noConflict: function() {
                 if (window.Jiesa === Jiesa) {
