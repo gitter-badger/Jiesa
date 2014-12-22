@@ -1,8 +1,13 @@
 # Jiesa
 
-Jiesa is a lightning fast event manager using the newest technology. It's designed for desktop, mobile, and touch-based browsers. **requestAnimationFrame** are supported through plugins in the **plugin folder**  and are used for **scroll** and **mousemove** events.
+Jiesa is a lightning fast event manager using the newest technology. It's designed for desktop, mobile, and touch-based browsers. 
 
-As a start,- it works like this:
+**frame events** with **requestAnimationFrame** are supported through plugins in the **plugin folder**  and are used for **scroll** and **mousemove** events. This is a good thing if you are doing a lot of animation, because the browser is flooding your code with events, which could make your page slow. For further reading, see this articles:
+
+* http://www.html5rocks.com/en/tutorials/speed/animations/
+* http://www.html5rocks.com/en/tutorials/speed/scrolling/
+
+As a starting point for Jiesa,- it works like this:
 
 ```javascript
 
