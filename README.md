@@ -62,15 +62,15 @@ Jiesa.on(element, { click: clickHandler, keyup: keyupHandler })
 
 // add  events using object literal and exposed events
 
- var literal = {
+
+  Jiesa.on(element,  {
   click: function(div) { 
   // <div> is the element was clicked 
   },
   mouseenter: function(div) { 
   // <div> is the element that was hovered over
-  }
+  }, ['currentTarget'])
 
-  Jiesa.on(element, literal, ['currentTarget'])
 
 ```
 
