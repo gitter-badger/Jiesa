@@ -114,6 +114,30 @@ Jiesa.off(element, 'click');
 Jiesa.off(element, { click: clickHandler, keyup: keyupHandler })
 
 ```
+
+##Fire
+
+Triggers an event of specific type with optional extra arguments
+
+**Arguments**
+
+*Jiesa.off()* unbind an event from the element. This is how you get rid of handlers once you no longer want them active. 
+
+* element / object (*DOM Element or Object*) - an HTML DOM element
+* type (*String*) - an event (or multiple events, space separated) to trigger
+* arg (*Objectl*) - optional repeatable extra arguments to pass into each event handler
+
+**Example**
+
+```javascript 
+
+// fire click event
+
+Jiesa.fire(element, 'click');
+
+
+```
+
 #Browser support
 
 All browsers, included **Internet Explorer 8**
