@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.2a
+ * Jiesa events api library v 0.0.3a
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -40,6 +40,103 @@
         supportMatchesSelector = rnative.test(matchesSelector);
 
 
+    // RAF
+    //______
+
+    var
+        top,
+        raf = window.requestAnimationFrame,
+        caf = window.cancelAnimationFrame || window.cancelRequestAnimationFrame;
+
+    // Test if we are within a foreign domain. Use raf from the top if possible.
+
+    try {
+        // Accessing .name will throw SecurityError within a foreign domain.
+        window.top.name;
+        top = window.top;
+    } catch (e) {
+        top = window;
+    }
+
+    if (!raf) {
+
+        // requestAnimationFrame
+
+        raf = top.requestAnimationFrame ||
+            top.webkitRequestAnimationFrame ||
+            top.mozRequestAnimationFrame ||
+            top.msRequestAnimationFrame;
+
+        // cancelAnimationFrame
+        caf = top.CancelAnimationFrame ||
+            top.webkitCancelAnimationFrame ||
+            top.webkitCancelRequestAnimationFrame ||
+            top.mozCancelAnimationFrame ||
+            top.msCancelAnimationFrame;
+    }
+
+    // Some versions of FF have rAF but not cAF
+    if (!raf || !caf) {
+
+        var last = 0,
+            id = 0,
+
+            queue = [],
+            frameDuration = 1000 / 60;
+
+        raf = function(callback) {
+            if (queue.length === 0) {
+                var i = 0,
+                    l, _now = Date.now(),
+                    next = Math.max(0, frameDuration - (_now - last));
+
+                last = next + _now;
+
+                setTimeout(function() {
+                    var cp = queue.slice(0);
+                    // Clear queue here to prevent
+                    // callbacks from appending listeners
+                    // to the current frame's queue
+                    queue.length = 0;
+                    l = cp.length;
+                    for (; i < l; i++) {
+                        if (!cp[i].cancelled) {
+                            try {
+                                cp[i].callback(last);
+                            } catch (e) {
+                                setTimeout(function() {
+                                    throw e;
+                                }, 0);
+                            }
+                        }
+                    }
+                }, Math.round(next));
+            }
+            queue.push({
+                handle: ++id,
+                callback: callback,
+                cancelled: false
+            });
+            return id;
+        };
+
+        caf = function(handle) {
+            var i = 0;
+            for (; i < queue.length; i++) {
+                if (queue[i].handle === handle) {
+                    queue[i].cancelled = true;
+                }
+            }
+        };
+    }
+
+    var _requestFrame = function(callback) {
+        raf(callback);
+    };
+
+    var _cancelFrame = function(frameId) {
+        raf(frameId);
+    };
 
     /**
      * Determines if a reference is a `String`.
@@ -61,6 +158,19 @@
     function isFunction(value) {
         return typeof value === 'function';
     }
+
+    /**
+     * Determines if a reference is an `Object`. Unlike `typeof` in JavaScript, `null`s are not
+     * considered to be objects. Note that JavaScript arrays are objects.
+     *
+     * @param {*} value Reference to check.
+     * @returns {boolean} True if `value` is an `Object` but not `null`.
+     */
+    function isObject(value) {
+        // http://jsperf.com/isobject4
+        return value !== null && typeof value === 'object';
+    }
+
 
     /**
      *  matchesSelector for matching delegated events
@@ -340,8 +450,10 @@
             fn.__eventId = uid;
             return node;
 
+            // TODO: Mouseenter are not working here. FIX IT!
 
-        } else if (typeof type === 'object') {
+        } else if (isObject(type)) {
+
             if (isArray(type)) {
                 type.forEach(function(name) {
                     if (once) {
@@ -351,11 +463,16 @@
                     }
                 });
             } else {
+
+                if (args === undefined && isArray(selector)) {
+                    args = selector;
+                    selector = void 0;
+                }
                 Object.keys(type).forEach(function(name) {
                     if (once) {
-                        _once(node, name, type[name]);
+                        _once(node, name, selector, args, type[name]);
                     } else {
-                        _on(node, name, type[name]);
+                        _on(node, name, selector, args, type[name]);
                     }
                 });
             }
@@ -369,6 +486,14 @@
     /**
      * Remove event to element.
      * Using removeEventListener or detachEvent (IE8)
+     */
+
+    /**
+     * Unbind a DOM event from the context
+     * @memberOf DOMNode.prototype
+     * @param  {String} type event type
+     * @param  {DOMNode#eventCallback} [callback]  event handler
+     * @return {DOMNode} current context
      */
 
     function _off(node, type, selector, callback) {
@@ -461,6 +586,22 @@
         return canContinue;
     }
 
+    // EventHandler hooks
+
+    ['scroll', 'mousemove'].forEach(function(name) {
+        eventHooks[name] = function(handler) {
+            var free = true;
+            // debounce frequent events
+            return function(e) {
+                if (free) {
+                    free = raf(function() {
+                        free = !handler(e);
+                    });
+                }
+            };
+        };
+    });
+
     if ('onfocusin' in document.documentElement) {
         eventHooks.focus = function(handler) {
             handler._type = 'focusin';
@@ -486,6 +627,8 @@
             once: _once,
             off: _off,
             trigger: _fire,
+            raf: _requestFrame,
+            caf: _cancelFrame,
             noConflict: function() {
                 if (window.Jiesa === Jiesa) {
                     window.Jiesa = _Jiesa;
