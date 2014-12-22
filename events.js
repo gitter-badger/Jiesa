@@ -79,69 +79,6 @@
             top.msCancelAnimationFrame;
     }
 
-    // Some versions of FF have rAF but not cAF
-    if (!raf || !caf) {
-
-        var last = 0,
-            id = 0,
-
-            queue = [],
-            frameDuration = 1000 / 60;
-
-        raf = function(callback) {
-            if (queue.length === 0) {
-                var i = 0,
-                    l, _now = Date.now(),
-                    next = Math.max(0, frameDuration - (_now - last));
-
-                last = next + _now;
-
-                setTimeout(function() {
-                    var cp = queue.slice(0);
-                    // Clear queue here to prevent
-                    // callbacks from appending listeners
-                    // to the current frame's queue
-                    queue.length = 0;
-                    l = cp.length;
-                    for (; i < l; i++) {
-                        if (!cp[i].cancelled) {
-                            try {
-                                cp[i].callback(last);
-                            } catch (e) {
-                                setTimeout(function() {
-                                    throw e;
-                                }, 0);
-                            }
-                        }
-                    }
-                }, Math.round(next));
-            }
-            queue.push({
-                handle: ++id,
-                callback: callback,
-                cancelled: false
-            });
-            return id;
-        };
-
-        caf = function(handle) {
-            var i = 0;
-            for (; i < queue.length; i++) {
-                if (queue[i].handle === handle) {
-                    queue[i].cancelled = true;
-                }
-            }
-        };
-    }
-
-    var _requestFrame = function(callback) {
-        raf(callback);
-    };
-
-    var _cancelFrame = function(frameId) {
-        raf(frameId);
-    };
-
     /**
      * Determines if a reference is a `String`.
      *
@@ -505,11 +442,14 @@
             return false;
         }
 
-        if (callback === void 0) {
+        if (callback === void 0 && selector !== void 0) {
             callback = selector;
             selector = void 0;
+            // Stop here, if no callback
+        } else {
+            return;
         }
-
+        // Get the handler
         var handler = events[type][callback.__eventId],
             skip = type !== handler.type;
 
@@ -533,69 +473,57 @@
 
     function _fire(node, type) {
 
-            var e, eventType, canContinue;
+        var e, eventType, canContinue;
 
-            if (isString(type)) {
+        if (isString(type)) {
 
-                var hook = eventHooks[type],
-                    handler = {};
+            var hook = eventHooks[type],
+                handler = {};
 
-                if (hook) {
-                    handler = hook(handler) || handler;
-                }
-
-                eventType = handler._type || type;
-            } else {
-                return false;
-            }
-            if (msie === 8) {
-                e = node.ownerDocument.createEventObject();
-                e['[[__node__]]'] = arguments;
-                // handle custom events for legacy IE
-                if (!('on' + eventType in node)) {
-                    eventType = customEventType;
-                }
-                // store original event type
-                if (eventType === customEventType) {
-                    e.srcUrn = type;
-                }
-
-                node.fireEvent('on' + eventType, e);
-
-                canContinue = e.returnValue !== false;
-            } else {
-                e = node.ownerDocument.createEvent('HTMLEvents');
-                e['[[__node__]]'] = arguments;
-                e.initEvent(eventType, true, true);
-                canContinue = node.dispatchEvent(e);
+            if (hook) {
+                handler = hook(handler) || handler;
             }
 
-            // call native function to trigger default behavior
-            if (canContinue && node[type]) {
-                // prevent re-triggering of the current event
-                createEventHandler.skip = type;
-
-                magicGuard(node, type);
-
-                createEventHandler.skip = null;
-            }
-
-            return canContinue;
+            eventType = handler._type || type;
+        } else {
+            return false;
         }
-        // EventHandler hooks
+        if (msie === 8) {
+            e = node.ownerDocument.createEventObject();
+            e['[[__node__]]'] = arguments;
+            // handle custom events for legacy IE
+            if (!('on' + eventType in node)) {
+                eventType = customEventType;
+            }
+            // store original event type
+            if (eventType === customEventType) {
+                e.srcUrn = type;
+            }
 
-    ['scroll', 'mousemove'].forEach(function(name) {
-        eventHooks[name] = function(handler) {
-            var isRunning = true;
-            return function(e) {
-                if (isRunning) {
-                    isRunning = raf(function() {
-                        isRunning = !handler(e);
-                    });
-                }
-            };
-        };
-    });
+            node.fireEvent('on' + eventType, e);
+
+            canContinue = e.returnValue !== false;
+        } else {
+            e = node.ownerDocument.createEvent('HTMLEvents');
+            e['[[__node__]]'] = arguments;
+            e.initEvent(eventType, true, true);
+            canContinue = node.dispatchEvent(e);
+        }
+
+        // call native function to trigger default behavior
+        if (canContinue && node[type]) {
+            // prevent re-triggering of the current event
+            createEventHandler.skip = type;
+
+            magicGuard(node, type);
+
+            createEventHandler.skip = null;
+        }
+
+        return canContinue;
+    }
+
+    // EventHandler hooks
 
     if ('onfocusin' in document.documentElement) {
         eventHooks.focus = function(handler) {
@@ -622,8 +550,7 @@
             once: _once,
             off: _off,
             trigger: _fire,
-            raf: _requestFrame,
-            caf: _cancelFrame,
+            eventHooks: eventHooks,
             noConflict: function() {
                 if (window.Jiesa === Jiesa) {
                     window.Jiesa = _Jiesa;
