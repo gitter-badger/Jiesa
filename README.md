@@ -27,7 +27,7 @@ Jiesa.on(element, 'click', '#test', function () {
 * Jiesa.off()
 * Jiesa.fire()
 
-#ON
+##ON
 
 Attach event listeners to both elements and objects:
 
@@ -42,7 +42,7 @@ Jiesa.on()
 * args (*Array*) - an optional array of handler arguments to pass to the callback function 
 * callback (*Function*)	- the callback function
 
-#ONCE
+##ONCE
 
 **Arguments**
 
@@ -54,7 +54,7 @@ Jiesa.on()
 * args (*Array*) - an optional array of handler arguments to pass to the callback function 
 * callback (*Function*)	- the callback function
 
-#OFF
+##OFF
 
 **Arguments**
 
