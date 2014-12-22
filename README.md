@@ -42,6 +42,25 @@ Jiesa.on()
 * args (*Array*) - an optional array of handler arguments to pass to the callback function 
 * callback (*Function*)	- the callback function
 
+###Examples
+
+```javascript 
+
+// event delegated events
+Jiesa.on(element, 'click', '#test', handler);
+
+// Several event types
+Jiesa.on(element, ["focus", "blur"], handler);
+
+Jiesa.on(element, "click", "span", ["currentTarget"], function(span) {
+// <span> is the element was clicked
+});
+
+// add  events using object literal
+
+Jiesa.on(element, { click: clickHandler, keyup: keyupHandler })
+```
+
 ##ONCE
 
 **Arguments**
@@ -54,6 +73,15 @@ Jiesa.on()
 * args (*Array*) - an optional array of handler arguments to pass to the callback function 
 * callback (*Function*)	- the callback function
 
+###Examples
+
+```javascript 
+
+// event delegated events
+Jiesa.once(element, 'click', handler);
+
+```
+
 ##OFF
 
 **Arguments**
@@ -65,7 +93,27 @@ Jiesa.on()
 * selector (*optional*) - optional CSS DOM Element selector
 * callback (*Function*)	- optional callback function to remove
 
+###Examples
 
+```javascript 
+
+// remove a single event handlers
+
+Jiesa.off(element, 'click', handler);
+
+// remove multiple events
+Jiesa.off(element, 'mousedown mouseup');
+
+// remove a click handler for a particular selector
+Jiesa.off(element, 'click', '#test', handler);
+
+// remove all click handlers
+Jiesa.off(element, 'click');
+
+// remove handlers for events using object literal
+Jiesa.off(element, { click: clickHandler, keyup: keyupHandler })
+
+```
 #Browser support
 
 All browsers, included **Internet Explorer 8**
