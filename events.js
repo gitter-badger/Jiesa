@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.3a
+ * Jiesa events api library v 0.0.3b
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -7,13 +7,15 @@
  */
 (function(window, undefined) {
 
-    // events.js
     var __eventId = 1,
         docElem = document.documentElement,
         registry = {},
         customEventType = 'ie8',
 
-        // Support: IE8+
+        /**
+         * @param {*} obj
+         * @return {boolean} Returns true if `obj` is an array or array-like object (NodeList, Arguments, String ...)
+         */
 
         isArray = Array.isArray || function(obj) {
             return Object.prototype.toString.call(obj) === '[object Array]';
@@ -27,7 +29,10 @@
         msie = document.documentMode,
 
         // Event hooks
+
         eventHooks = {},
+
+        // matchesSelector
 
         matchesSelector = docElem.matches ||
         docElem.webkitMatchesSelector ||
@@ -39,8 +44,7 @@
 
         supportMatchesSelector = rnative.test(matchesSelector);
 
-
-    // RAF
+    // requestAnimationFrame with polyfill for Internet Explorer 8 (rAF)
     //______
 
     var
@@ -171,7 +175,6 @@
         return value !== null && typeof value === 'object';
     }
 
-
     /**
      *  matchesSelector for matching delegated events
      */
@@ -222,15 +225,17 @@
      */
 
     function getEventId(node) {
-            return node.__eventId || (node.__eventId = __eventId++);
-        }
-        /**
-         * Get Jiesa events
-         *
-         * @param {Object} node The element to get Jiesa events from
-         *
-         * @return {Number}
-         */
+        return node.__eventId || (node.__eventId = __eventId++);
+    }
+
+    /**
+     * Get Jiesa events
+     *
+     * @param {Object} node The element to get Jiesa events from
+     *
+     * @return {Number}
+     */
+
     function getEvents(node) {
         var uid = getEventId(node);
         return (registry[uid] = registry[uid] || {});
@@ -528,66 +533,64 @@
 
     function _fire(node, type) {
 
-        var e, eventType, canContinue;
+            var e, eventType, canContinue;
 
-        if (isString(type)) {
+            if (isString(type)) {
 
-            var hook = eventHooks[type],
-                handler = {};
+                var hook = eventHooks[type],
+                    handler = {};
 
-            if (hook) {
-                handler = hook(handler) || handler;
+                if (hook) {
+                    handler = hook(handler) || handler;
+                }
+
+                eventType = handler._type || type;
+            } else {
+                return false;
+            }
+            if (msie === 8) {
+                e = node.ownerDocument.createEventObject();
+                e['[[__node__]]'] = arguments;
+                // handle custom events for legacy IE
+                if (!('on' + eventType in node)) {
+                    eventType = customEventType;
+                }
+                // store original event type
+                if (eventType === customEventType) {
+                    e.srcUrn = type;
+                }
+
+                node.fireEvent('on' + eventType, e);
+
+                canContinue = e.returnValue !== false;
+            } else {
+                e = node.ownerDocument.createEvent('HTMLEvents');
+                e['[[__node__]]'] = arguments;
+                e.initEvent(eventType, true, true);
+                canContinue = node.dispatchEvent(e);
             }
 
-            eventType = handler._type || type;
-        } else {
-            return false;
-        }
-        if (msie === 8) {
-            e = node.ownerDocument.createEventObject();
-            e['[[__node__]]'] = arguments;
-            // handle custom events for legacy IE
-            if (!('on' + eventType in node)) {
-                eventType = customEventType;
-            }
-            // store original event type
-            if (eventType === customEventType) {
-                e.srcUrn = type;
+            // call native function to trigger default behavior
+            if (canContinue && node[type]) {
+                // prevent re-triggering of the current event
+                createEventHandler.skip = type;
+
+                magicGuard(node, type);
+
+                createEventHandler.skip = null;
             }
 
-            node.fireEvent('on' + eventType, e);
-
-            canContinue = e.returnValue !== false;
-        } else {
-            e = node.ownerDocument.createEvent('HTMLEvents');
-            e['[[__node__]]'] = arguments;
-            e.initEvent(eventType, true, true);
-            canContinue = node.dispatchEvent(e);
+            return canContinue;
         }
-
-        // call native function to trigger default behavior
-        if (canContinue && node[type]) {
-            // prevent re-triggering of the current event
-            createEventHandler.skip = type;
-
-            magicGuard(node, type);
-
-            createEventHandler.skip = null;
-        }
-
-        return canContinue;
-    }
-
-    // EventHandler hooks
+        // EventHandler hooks
 
     ['scroll', 'mousemove'].forEach(function(name) {
         eventHooks[name] = function(handler) {
-            var free = true;
-            // debounce frequent events
+            var isRunning = true;
             return function(e) {
-                if (free) {
-                    free = raf(function() {
-                        free = !handler(e);
+                if (isRunning) {
+                    isRunning = raf(function() {
+                        isRunning = !handler(e);
                     });
                 }
             };
