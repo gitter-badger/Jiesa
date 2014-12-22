@@ -42,7 +42,7 @@ Jiesa.on()
 * args (*Array*) - an optional array of handler arguments to pass to the callback function 
 * callback (*Function*)	- the callback function
 
-###Examples
+**Examples**
 
 ```javascript 
 
@@ -73,11 +73,11 @@ Jiesa.on(element, { click: clickHandler, keyup: keyupHandler })
 * args (*Array*) - an optional array of handler arguments to pass to the callback function 
 * callback (*Function*)	- the callback function
 
-###Examples
+**Example**
 
 ```javascript 
 
-// event delegated events
+// event get removed after first click
 Jiesa.once(element, 'click', handler);
 
 ```
@@ -93,7 +93,7 @@ Jiesa.once(element, 'click', handler);
 * selector (*optional*) - optional CSS DOM Element selector
 * callback (*Function*)	- optional callback function to remove
 
-###Examples
+**Examples**
 
 ```javascript 
 
