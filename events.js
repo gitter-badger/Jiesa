@@ -242,7 +242,9 @@
                 }
                 // srcElement can be null in IE8 when target is document
                 var target = evt.target || evt.srcElement || node.ownerDocument.documentElement,
-                    currentTarget = matcher ? matcher(target) : node,
+                    currentTarget = matcher && target.nodeType === 1 &&
+                    // Don't process clicks on disabled elements
+                    (target.disabled !== true || event.type !== 'click') ? matcher(target) : node,
 
                     // Expose a few default events
 
@@ -296,6 +298,11 @@
 
     function _on(node, type, selector, args, callback, once) {
 
+        // Don't attach events to noData or text/comment nodes (allow plain objects tho)
+        if (node.nodeType === 3 || node.nodeType === 8 || !type) {
+            return;
+        }
+
         if (!node[EVENT]) {
             node[EVENT] = [];
         }
@@ -333,7 +340,7 @@
                 }
             }
 
-            node[EVENT].push(handler)
+            node[EVENT].push(handler);
 
             // TODO: Mouseenter are not working here. FIX IT!
 
@@ -410,6 +417,12 @@
      */
 
     function _fire(node, type, detail) {
+
+        // Don't do events on text and comment nodes
+        if (node && (node.nodeType === 3 ||
+                node.nodeType === 8)) {
+            return;
+        }
 
         var e, eventType, canContinue;
 
@@ -499,7 +512,7 @@
                 node.forEach(function(node) {
                     _on(node, type, selector, args, callback, once);
 
-                })
+                });
             },
             once: function(node, type, selector, args, callback) {
                 return this.on(node, type, selector, args, callback, 1);
