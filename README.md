@@ -1,5 +1,7 @@
 # Jiesa
 
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Kflash/Jiesa?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Jiesa is a lightning fast event manager using the newest technology. It's designed for desktop, mobile, and touch-based browsers. 
 
 **frame events** with **requestAnimationFrame** are supported through plugins in the **plugin folder**  and are used for 
