@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.6c
+ * Jiesa events api library v 0.0.7a
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -38,6 +38,34 @@
 
         eventHooks = {},
 
+        // Detects XML nodes
+
+        isXML = function(node) {
+            var documentElement = node && (node.ownerDocument || node).documentElement;
+            return documentElement ? documentElement.nodeName !== 'HTML' : false;
+        },
+
+        // Marker for native QSA
+
+        usaQSA = true,
+
+        // selector engine for delegated events, use querySelectorAll if it exists
+
+        selectorEngine,
+
+        setSelectorEngine = function(e) {
+            if (!arguments.length) {
+                selectorEngine = doc.querySelectorAll ? function(s, r) {
+                    return r.querySelectorAll(s);
+                } : function() {
+                    throw new Error('Jiesa: No selector engine installed');
+                }
+            } else {
+                qsa = false;
+                selectorEngine = e;
+            }
+        },
+
         // matchesSelector
 
         matchesSelector = docElem.matches ||
@@ -50,10 +78,20 @@
 
         supportMatchesSelector = rnative.test(matchesSelector),
 
-        // selectorEngine for delegated events. It's using matchesSelector if it exists
+        // Support: IE9 - disconnected nodes
+
+        disconnectedNodes = (function() {
+            var div = document.createElement('div'),
+                ret = !!matchesSelector.call(div, 'div');
+            // Avoid memory leaks in IE
+            div = null;
+            return ret;
+        }()),
+
+        // matchesSelector for delegated events. It's using matchesSelector if it exists
         // with fallback to querySelectorAll for older browsers (e.g. IE8, Opera 12.x) 
 
-        selectorEngine = function(selector, context) {
+        JiesaMatches = function(selector, context) {
 
             if (!isString(selector)) return null;
 
@@ -61,12 +99,16 @@
 
                 var n, res, found, index, length;
 
-                if (!supportMatchesSelector) {
-                    found = (context || node.ownerDocument).querySelectorAll(selector);
+                if (!supportMatchesSelector || (supportMatchesSelector && isXML(doc))) {
+                    // querySelectorAll are not supported on XML documents
+                    if (usaQSA && isXML(doc)) {
+                        throw new Error('Jiesa: XML documents are not supported by this selector engine');
+                    }
+                    found = selectorEngine(selector, (context || node.ownerDocument));
                 }
 
                 for (; node && node.nodeType === 1; node = node.parentNode) {
-                    if (supportMatchesSelector) {
+                    if (supportMatchesSelector && disconnectedNodes) {
                         res = matchesSelector.call(node, selector);
                     } else {
                         index = 0;
@@ -196,7 +238,7 @@
 
         createEventHandler = function(type, selector, callback, props, node, once) {
 
-            var matcher = selectorEngine(selector, node),
+            var matcher = JiesaMatches(selector, node),
                 hook = eventHooks[type],
                 handler = function(evt) {
 
@@ -479,31 +521,32 @@
 
     var _Jiesa = win.Jiesa,
         Jiesa = {
-            on: function(node, type, selector, args, callback, once) {
+            'on': function(node, type, selector, args, callback, once) {
                 node = node.length ? node : [node];
                 node.forEach(function(node) {
                     add(node, type, selector, args, callback, once);
 
                 });
             },
-            once: function(node, type, selector, args, callback) {
+            'once': function(node, type, selector, args, callback) {
                 return this.on(node, type, selector, args, callback, 1);
             },
 
-            off: function(node, type, selector, callback) {
+            'off': function(node, type, selector, callback) {
                 node = node.length ? node : [node];
                 node.forEach(function(node) {
                     removeListener(node, type, selector, callback);
 
                 });
             },
-            fire: function(node, type, detail) {
+            'fire': function(node, type, detail) {
                 node = node.length ? node[0] : node;
                 return trigger(node, type, detail);
 
             },
-            eventHooks: eventHooks,
-            noConflict: function() {
+            'setSelectorEngine': setSelectorEngine,
+            'eventHooks': eventHooks,
+            'noConflict': function() {
                 if (win.Jiesa === Jiesa) {
                     win.Jiesa = _Jiesa;
                 }
@@ -511,6 +554,8 @@
                 return Jiesa;
             }
         };
+    // initialize selector engine to internal default (qSA or throw Error)
+    setSelectorEngine();
 
     win.Jiesa = Jiesa;
 
