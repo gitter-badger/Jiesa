@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.7b
+ * Jiesa events api library v 0.0.8a
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -19,7 +19,9 @@
         customEventType = 'ie8Custom',
         NODE = '[[__node__]]',
         EVENT = '[[__event__]]',
+        
         rnative = /^[^{]+\{\s*\[native \w/,
+        collectionCbRegEx = /callback\.call\(([^)]+)\)/g,
 
         isString = function(value) {
             return typeof value === 'string';
@@ -27,12 +29,56 @@
         isFunction = function(value) {
             return typeof value === 'function';
         },
+        isNumber = function(value) {
+            return typeof value === 'number';
+        },
         isObject = function(value) {
             return value !== null && typeof value === 'object';
         },
         isArray = Array.isArray || function(obj) {
             return Object.prototype.toString.call(obj) === '[object Array]';
         },
+
+        // For better performance, let us create our own collection methods
+
+        cbDefaults = {
+            BEFORE: '',
+            COUNT: 'a ? a.length : 0',
+            BODY: '',
+            AFTER: ''
+        },
+
+        makeCollection = (function() {
+            return function(options) {
+                var code = '%BEFORE%\nvar i=0,n=%COUNT%;for(;i<n;++i){%BODY%}%AFTER%',
+                    key;
+
+                for (key in cbDefaults) {
+                    code = code.replace('%' + key + '%', options[key] || cbDefaults[key]);
+                }
+
+                code = code.replace(collectionCbRegEx, function(expr, args) {
+                    return '(that?' + expr + ':callback(' + args.split(',').slice(1).join() + '))';
+                });
+
+                return Function('a', 'callback', 'that', 'undefined', code);
+            };
+        })(),
+
+        each = makeCollection({
+            BODY: 'callback.call(that, a[i], i, a)',
+            AFTER: 'return a'
+        }),
+        filter = makeCollection({
+            BEFORE: 'var arr = []',
+            BODY: 'if (callback.call(that, a[i], i, a)) arr.push(a[i])',
+            AFTER: 'return arr'
+        }),
+        map = makeCollection({
+            BEFORE: 'var arr = Array(a && a.length || 0)',
+            BODY: 'arr[i] = callback.call(that, a[i], i, a)',
+            AFTER: 'return arr'
+        }),
 
         // A container 'hook' for special event types
 
@@ -49,10 +95,10 @@
 
         supportQSA = rnative.test(docElem.querySelectorAll),
 
+        // Check for querySelectorAll browser bugs
         qsaBugs = (function() {
 
             var buggy = [],
-                selected,
                 id = 'jiesa_unique',
                 whitespace = "[\\x20\\t\\r\\n\\f]",
                 booleans = 'checked|selected|async|autofocus|autoplay|controls|defer|disabled|hidden|ismap|loop|multiple|open|readonly|required|scoped',
@@ -64,7 +110,7 @@
 
             // Support: IE8, Opera 11-12.16
             if (div.querySelectorAll("[msallowcapture^='']").length) {
-                rbuggyQSA.push("[*^$]=" + whitespace + "*(?:''|\"\")");
+                buggy.push("[*^$]=" + whitespace + "*(?:''|\"\")");
             }
 
             // Support: IE8
@@ -104,7 +150,7 @@
 
         setSelectorEngine = function(e) {
             if (!arguments.length) {
-                selectorEngine = supportQSA && !qsaBugs && doc.querySelectorAll ? function(selector, context) {
+                selectorEngine = supportQSA && doc.querySelectorAll ? function(selector, context) {
                     return context.querySelectorAll(selector);
                 } : function() {
                     throw new Error('Jiesa: No selector engine installed');
@@ -127,6 +173,8 @@
         docElem.msMatchesSelector,
 
         // Check if matchesSelector are supported by the browser
+        // I'm well aware that that matchesSelector have bugs regarding 
+        // a few CSS2/CSS3 pseudo selectors, but should we check for it or not??
 
         supportMatchesSelector = rnative.test(matchesSelector),
 
@@ -145,7 +193,9 @@
 
         JiesaMatches = function(selector, context) {
 
-            if (!isString(selector)) return null;
+            if (!isString(selector)) {
+                return null;
+            }
 
             return function(node) {
 
@@ -153,14 +203,19 @@
 
                 if (!supportMatchesSelector || (supportMatchesSelector && isXML(doc))) {
                     // querySelectorAll are not supported on XML documents
-                    if (useQSA && isXML(doc)) {
-                        throw new Error('Jiesa: XML documents are not supported by this selector engine');
+                    if (useQSA && (qsaBugs.test(selector) || isXML(doc))) {
+                        throw new Error('Jiesa: This version of querySelectorAll (QSA) are not supported.');
                     }
                     found = selectorEngine(selector, (context || node.ownerDocument));
                 }
 
                 for (; node && node.nodeType === 1; node = node.parentNode) {
-                    if (supportMatchesSelector && disconnectedNodes) {
+                    if (supportMatchesSelector &&
+                        // IE 9's matchesSelector returns false on disconnected nodes
+                        (disconnectedNodes ||
+                            // As well, disconnected nodes are said to be in a document
+                            // fragment in IE 9
+                            node.document && node.document.nodeType !== 11)) {
                         res = matchesSelector.call(node, selector);
                     } else {
                         index = 0;
@@ -190,7 +245,7 @@
 
         fixEvents = function(name, evt, type, node, target, currentTarget) {
 
-            if (typeof name === 'number') {
+            if (isNumber(name)) {
                 var args = evt[NODE];
                 return args ? args[name] : void 0;
             }
@@ -271,6 +326,7 @@
         // call various functions safely with a context and arguments 
 
         magicGuard = function(context, fn, arg1, arg2) {
+
             if (isString(fn)) {
                 fn = context[fn];
             }
@@ -288,7 +344,7 @@
 
         // Create event handler
 
-        createEventHandler = function(type, selector, callback, props, node, once) {
+        wrappedHandler = function(node, type, selector, callback, props, once) {
 
             var matcher = JiesaMatches(selector, node),
                 hook = eventHooks[type],
@@ -300,7 +356,7 @@
 
                     // early stop in case of default action
 
-                    if (createEventHandler.skip === type) {
+                    if (wrappedHandler.skip === type) {
                         return;
                     }
 
@@ -324,7 +380,7 @@
                     }
 
                     if (props) {
-                        args = args.map(function(name) {
+                        args = map(args, function(name) {
                             return fixEvents(
                                 name, evt, type, node, target, currentTarget);
                         });
@@ -398,7 +454,7 @@
                     return false;
                 }
 
-                var handler = createEventHandler(type, selector, callback, args, node, once);
+                var handler = wrappedHandler(node, type, selector, callback, args, once);
 
                 if (handler) {
                     if (W3C_MODEL) {
@@ -415,7 +471,7 @@
             } else if (isObject(type)) {
 
                 if (isArray(type)) {
-                    type.forEach(function(name) {
+                    each(type, function(name) {
                         if (once) {
                             temp(node, name, selector, args, callback, true);
                         } else {
@@ -428,7 +484,7 @@
                         args = selector;
                         selector = void 0;
                     }
-                    Object.keys(type).forEach(function(name) {
+                    each(Object.keys(type), function(name) {
                         if (once) {
                             temp(node, name, selector, args, type[name], true);
                         } else {
@@ -451,13 +507,14 @@
 
             if (node === undefined || !node[EVENT] || !isString(type)) {
                 return;
+
             }
             if (callback === void 0 && selector !== void 0) {
                 callback = selector;
                 selector = void 0;
             }
 
-            node[EVENT].filter(function(handler) {
+            filter(node[EVENT], function(handler) {
 
                 var skip = type !== handler.type;
 
@@ -540,11 +597,11 @@
             if (canContinue && node[type]) {
 
                 // prevent re-triggering of the current event
-                createEventHandler.skip = type;
+                wrappedHandler.skip = type;
 
                 magicGuard(node, type);
 
-                createEventHandler.skip = null;
+                wrappedHandler.skip = null;
             }
 
             return canContinue;
@@ -575,7 +632,7 @@
         Jiesa = {
             'on': function(node, type, selector, args, callback, once) {
                 node = node.length ? node : [node];
-                node.forEach(function(node) {
+                each(node, function(node) {
                     add(node, type, selector, args, callback, once);
 
                 });
@@ -586,7 +643,7 @@
 
             'off': function(node, type, selector, callback) {
                 node = node.length ? node : [node];
-                node.forEach(function(node) {
+                each(node, function(node) {
                     removeListener(node, type, selector, callback);
 
                 });
