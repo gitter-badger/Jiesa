@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.5a
+ * Jiesa events api library v 0.0.6a
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -8,33 +8,33 @@
 (function(window, undefined) {
 
     var
-        docElem = document.documentElement,
-        customEventType = 'ie8',
-
-        /**
-         * Short-hands
-         */
-
+        win = window,
+        addEvent = 'addEventListener',
+        attachEvent = 'attachEvent',
+        removeEvent = 'removeEventListener',
+        detachEvent = 'detachEvent',
+        doc = document || {},
+        docElem = doc.documentElement || {},
+        W3C_MODEL = docElem[addEvent],
+        customEventType = 'ie8Custom',
         NODE = '[[__node__]]',
         EVENT = '[[__event__]]',
+        rnative = /^[^{]+\{\s*\[native \w/,
 
-        /**
-         * @param {*} obj
-         * @return {boolean} Returns true if `obj` is an array or array-like object (NodeList, Arguments, String ...)
-         */
-
+        isString = function(value) {
+            return typeof value === 'string';
+        },
+        isFunction = function(value) {
+            return typeof value === 'function';
+        },
+        isObject = function(value) {
+            return value !== null && typeof value === 'object';
+        },
         isArray = Array.isArray || function(obj) {
             return Object.prototype.toString.call(obj) === '[object Array]';
         },
 
-        /**
-         * documentMode is an IE-only property
-         * http://msdn.microsoft.com/en-us/library/ie/cc196988(v=vs.85).aspx
-         */
-
-        msie = document.documentMode,
-
-        // Event hooks
+        // Container for special event types
 
         eventHooks = {},
 
@@ -46,90 +46,55 @@
         docElem.oMatchesSelector ||
         docElem.msMatchesSelector,
 
-        rnative = /^[^{]+\{\s*\[native \w/,
-
         // Check if matchesSelector are supported by the browser
 
-        supportMatchesSelector = rnative.test(matchesSelector);
+        supportMatchesSelector = rnative.test(matchesSelector),
 
-    /**
-     * Determines if a reference is a `String`.
-     *
-     * @param {*} value Reference to check.
-     * @returns {boolean} True if `value` is a `String`.
-     */
+        // selector matches for delegated events, use matchesSelector if it exists
+        // with fallback to querySelectorAll for older browsers
 
-    function isString(value) {
-        return typeof value === 'string';
-    }
+        selectormatcher = function(selector, context) {
 
-    /**
-     * Determines if a reference is a `Function`.
-     *
-     * @param {*} value Reference to check.
-     * @returns {boolean} True if `value` is a `Function`.
-     */
+            if (!isString(selector)) return null;
 
-    function isFunction(value) {
-        return typeof value === 'function';
-    }
+            return function(node) {
 
-    /**
-     * Determines if a reference is an `Object`. Unlike `typeof` in JavaScript, `null`s are not
-     * considered to be objects. Note that JavaScript arrays are objects.
-     *
-     * @param {*} value Reference to check.
-     * @returns {boolean} True if `value` is an `Object` but not `null`.
-     */
-    function isObject(value) {
-        // http://jsperf.com/isobject4
-        return value !== null && typeof value === 'object';
-    }
+                var n, res, found, index, length;
 
-    /**
-     *  matchesSelector for matching delegated events
-     */
-    function selectormatcher(selector, context) {
+                if (!supportMatchesSelector) {
+                    found = (context || node.ownerDocument).querySelectorAll(selector);
+                }
 
-        if (!isString(selector)) {
-            return null;
-        }
-        return function(node) {
-
-            var n, res, found, index, length;
-
-            if (!supportMatchesSelector) {
-                found = (context || node.ownerDocument).querySelectorAll(selector);
-            }
-
-            for (; node && node.nodeType === 1; node = node.parentNode) {
-                if (supportMatchesSelector) {
-                    res = matchesSelector.call(node, selector);
-                } else {
-                    index = 0;
-                    length = found.length;
-                    for (; index < length;) {
-                        n = (found[index++]);
-                        if (n === node) {
-                            return n;
+                for (; node && node.nodeType === 1; node = node.parentNode) {
+                    if (supportMatchesSelector) {
+                        res = matchesSelector.call(node, selector);
+                    } else {
+                        index = 0;
+                        length = found.length;
+                        for (; index < length;) {
+                            n = (found[index++]);
+                            if (n === node) {
+                                return n;
+                            }
                         }
+
+                        index = length = void 0;
                     }
 
-                    index = length = void 0;
+                    if (res || !context || node === context) {
+                        break;
+                    }
                 }
 
-                if (res || !context || node === context) {
-                    break;
-                }
-            }
+                return res && node;
+            };
+        },
 
-            return res && node;
-        };
-    }
+        // clean up buggy and fix event properties to comply with W3C standards, before returning those 
+        // events who are requested by the end-developer by taking the actual DOM event object 
+        // and filter by user request.
 
-    // fix IE event properties to comply with W3C standards
-
-    function fixEvents(name, evt, type, node, target, currentTarget) {
+        fixEvents = function(name, evt, type, node, target, currentTarget) {
 
             if (typeof name === 'number') {
                 var args = evt[NODE];
@@ -137,7 +102,7 @@
             }
 
             // Support: IE8
-            if (msie === 8) {
+            if (!W3C_MODEL) {
                 var docEl = node.ownerDocument.documentElement;
 
                 if (name === 'which') {
@@ -201,11 +166,12 @@
             }
 
             return value;
-        }
-        // The guard function for buang. It let you
+        },
+
+        // The guard function for Jiesa. It let you
         // call various functions safely with a context and arguments 
 
-    function magicGuard(context, fn, arg1, arg2) {
+        magicGuard = function(context, fn, arg1, arg2) {
             if (isString(fn)) {
                 fn = context[fn];
             }
@@ -219,274 +185,274 @@
 
                 return false;
             }
-        }
+        },
         /**
          * Create event handler
          */
 
-    function createEventHandler(type, selector, callback, props, node, once) {
+        createEventHandler = function(type, selector, callback, props, node, once) {
 
-        var hook = eventHooks[type],
-            matcher = selectormatcher(selector, node),
-            handler = function(evt) {
+            var hook = eventHooks[type],
+                matcher = selectormatcher(selector, node),
+                handler = function(evt) {
 
-                evt = evt || window.event;
-                // early stop in case of default action
+                    evt = evt || window.event;
+                    // early stop in case of default action
 
-                if (createEventHandler.skip === type) {
-                    return;
+                    if (createEventHandler.skip === type) {
+                        return;
+                    }
+
+                    if (handler._type === customEventType && evt.srcUrn !== type) {
+                        return;
+                    }
+                    // srcElement can be null in IE8 when target is document
+                    var target = evt.target || evt.srcElement || node.ownerDocument.documentElement,
+                        currentTarget = matcher && target.nodeType === 1 &&
+                        // Don't process clicks on disabled elements
+                        (target.disabled !== true || event.type !== 'click') ? matcher(target) : node,
+
+                        // Expose a few default events
+
+                        args = props || [selector ? 'currentTarget' : 'target', 'defaultPrevented'];
+
+                    // return if the target doesn't match selector
+                    if (!currentTarget) {
+                        return;
+                    }
+                    // off callback even if it throws an exception later
+                    if (once === 1) {
+                        removeListener(node, type, callback);
+                    }
+
+                    if (props) {
+                        args = args.map(function(name) {
+                            return fixEvents(
+                                name, evt, type, node, target, currentTarget);
+                        });
+                    }
+
+                    // prevent default if handler returns false
+                    if (callback.apply(node, args) === false) {
+                        if (W3C_MODEL) {
+                            evt.preventDefault();
+                        } else {
+                            evt.returnValue = false;
+                        }
+                    }
+                };
+
+            if (hook) {
+                handler = hook(handler, type) || handler;
+            }
+            if (!W3C_MODEL && !('on' + (handler._type || type) in node)) {
+                // handle custom events for IE8
+                handler._type = customEventType;
+            }
+
+            handler.type = type;
+            handler.callback = callback;
+            handler.selector = selector;
+
+            return handler;
+        },
+
+        /**
+         * Add event to element.
+         * Using addEventListener or attachEvent (IE8)
+         */
+
+        add = function(node, type, selector, args, callback, once) {
+
+            // Don't attach events to noData or text/comment nodes (allow plain objects tho)
+            if (node.nodeType === 3 || node.nodeType === 8 || !type) {
+                return;
+            }
+
+            if (!node[EVENT]) {
+                node[EVENT] = [];
+            }
+            if (typeof type === 'string') {
+
+                if (isFunction(args)) {
+
+                    callback = args;
+
+                    if (isString(selector)) {
+                        args = null;
+                    } else {
+                        args = selector;
+                        selector = null;
+                    }
                 }
 
-                if (handler._type === customEventType && evt.srcUrn !== type) {
-                    return;
-                }
-                // srcElement can be null in IE8 when target is document
-                var target = evt.target || evt.srcElement || node.ownerDocument.documentElement,
-                    currentTarget = matcher && target.nodeType === 1 &&
-                    // Don't process clicks on disabled elements
-                    (target.disabled !== true || event.type !== 'click') ? matcher(target) : node,
-
-                    // Expose a few default events
-
-                    args = props || [selector ? 'currentTarget' : 'target', 'defaultPrevented'];
-
-                // return if the target doesn't match selector
-                if (!currentTarget) {
-                    return;
-                }
-                // off callback even if it throws an exception later
-                if (once === 1) {
-                    _off(node, type, callback);
+                if (isFunction(selector)) {
+                    callback = selector;
+                    selector = null;
+                    args = null;
                 }
 
-                if (props) {
-                    args = args.map(function(name) {
-                        return fixEvents(
-                            name, evt, type, node, target, currentTarget);
+                if (!isFunction(callback)) {
+                    return false;
+                }
+
+                var handler = createEventHandler(type, selector, callback, args, node, once);
+
+                if (handler) {
+                    if (W3C_MODEL) {
+                        node[addEvent](handler._type || type, handler, !!handler.capture);
+                    } else {
+                        node[attachEvent]('on' + (handler._type || type), handler);
+                    }
+                }
+
+                node[EVENT].push(handler);
+
+                // TODO: Mouseenter are not working here. FIX IT!
+
+            } else if (isObject(type)) {
+
+                if (isArray(type)) {
+                    type.forEach(function(name) {
+                        if (once) {
+                            temp(node, name, selector, args, callback, true);
+                        } else {
+                            add(node, name, selector, args, callback);
+                        }
+                    });
+                } else {
+
+                    if (args === undefined && isArray(selector)) {
+                        args = selector;
+                        selector = void 0;
+                    }
+                    Object.keys(type).forEach(function(name) {
+                        if (once) {
+                            temp(node, name, selector, args, type[name], true);
+                        } else {
+                            add(node, name, selector, args, type[name]);
+                        }
                     });
                 }
-
-                // prevent default if handler returns false
-                if (callback.apply(node, args) === false) {
-                    if (msie === 8) {
-                        evt.returnValue = false;
-                    } else {
-                        evt.preventDefault();
-                    }
-                }
-            };
-
-        if (hook) {
-            handler = hook(handler, type) || handler;
-        }
-        if (msie === 8 && !('on' + (handler._type || type) in node)) {
-            // handle custom events for IE8
-            handler._type = customEventType;
-        }
-
-        handler.type = type;
-        handler.callback = callback;
-        handler.selector = selector;
-
-        return handler;
-    }
-
-    /**
-     * Add event to element.
-     * Using addEventListener or attachEvent (IE8)
-     */
-
-    function _on(node, type, selector, args, callback, once) {
-
-        // Don't attach events to noData or text/comment nodes (allow plain objects tho)
-        if (node.nodeType === 3 || node.nodeType === 8 || !type) {
-            return;
-        }
-
-        if (!node[EVENT]) {
-            node[EVENT] = [];
-        }
-        if (typeof type === 'string') {
-
-            if (isFunction(args)) {
-
-                callback = args;
-
-                if (isString(selector)) {
-                    args = null;
-                } else {
-                    args = selector;
-                    selector = null;
-                }
             }
+        },
 
-            if (isFunction(selector)) {
-                callback = selector;
-                selector = null;
-                args = null;
-            }
+        // Helper function for Jiesa.once()
 
-            if (!isFunction(callback)) {
-                return false;
-            }
-
-            var handler = createEventHandler(type, selector, callback, args, node, once);
-
-            if (handler) {
-                if (msie === 8) {
-                    node.attachEvent('on' + (handler._type || type), handler);
-                } else {
-                    node.addEventListener(handler._type || type, handler, !!handler.capture);
-                }
-            }
-
-            node[EVENT].push(handler);
-
-            // TODO: Mouseenter are not working here. FIX IT!
-
-        } else if (isObject(type)) {
-
-            if (isArray(type)) {
-                type.forEach(function(name) {
-                    if (once) {
-                        _once(node, name, selector, args, callback, true);
-                    } else {
-                        _on(node, name, selector, args, callback);
-                    }
-                });
-            } else {
-
-                if (args === undefined && isArray(selector)) {
-                    args = selector;
-                    selector = void 0;
-                }
-                Object.keys(type).forEach(function(name) {
-                    if (once) {
-                        _once(node, name, selector, args, type[name], true);
-                    } else {
-                        _on(node, name, selector, args, type[name]);
-                    }
-                });
-            }
-        }
-    }
-
-    // Helper function
-
-    function _once(node, type, selector, args, callback) {
-            return _on(node, type, selector, args, callback, 1);
+        temp = function(node, type, selector, args, callback) {
+            return add(node, type, selector, args, callback, 1);
         }
         /**
          * Remove event to element.
          * Using removeEventListener or detachEvent (IE8)
          */
 
-    function _off(node, type, selector, callback) {
+    removeListener = function(node, type, selector, callback) {
 
-        if (node === undefined || !node[EVENT] || !isString(type)) {
-            return;
-        }
-        if (callback === void 0 && selector !== void 0) {
-            callback = selector;
-            selector = void 0;
-        }
-
-        node[EVENT].filter(function(handler) {
-
-            var skip = type !== handler.type;
-
-            skip = skip || selector && selector !== handler.selector;
-            skip = skip || callback && callback !== handler.callback;
-
-            if (skip) {
-                return true;
+            if (node === undefined || !node[EVENT] || !isString(type)) {
+                return;
+            }
+            if (callback === void 0 && selector !== void 0) {
+                callback = selector;
+                selector = void 0;
             }
 
-            type = handler._type || handler.type;
-            if (msie === 8) {
-                node.detachEvent('on' + type, handler);
+            node[EVENT].filter(function(handler) {
+
+                var skip = type !== handler.type;
+
+                skip = skip || selector && selector !== handler.selector;
+                skip = skip || callback && callback !== handler.callback;
+
+                if (skip) {
+                    return true;
+                }
+
+                type = handler._type || handler.type;
+                if (W3C_MODEL) {
+                    node[removeEvent](type, handler, !!handler.capture);
+                } else {
+                    node[detachEvent]('on' + type, handler);
+                }
+            });
+            return this;
+        },
+
+        /**
+         * Trigger specific event for element collection
+         */
+
+        trigger = function(node, type, detail) {
+
+            // Don't do events on text and comment nodes
+            if (node && (node.nodeType === 3 ||
+                    node.nodeType === 8)) {
+                return;
+            }
+
+            var e, eventType, canContinue;
+
+            if (isString(type)) {
+
+                var hook = eventHooks[type],
+                    handler = {};
+
+                if (hook) {
+                    handler = hook(handler) || handler;
+                }
+
+                eventType = handler._type || type;
             } else {
-                node.removeEventListener(type, handler, !!handler.capture);
+                return false;
             }
-        });
-        return this;
-    }
+            if (W3C_MODEL) {
+                if (~type.indexOf(':')) {
+                    e = new CustomEvent(eventType, {
+                        detail: detail,
+                        bubbles: true
+                    });
+                    e[NODE] = arguments;
+                } else {
+                    e = node.ownerDocument.createEvent('HTMLEvents');
+                    e[NODE] = arguments;
+                    e.initEvent(eventType, true, true);
+                }
 
-    /**
-     * Fire specific event for element collection
-     */
-
-    function _fire(node, type, detail) {
-
-        // Don't do events on text and comment nodes
-        if (node && (node.nodeType === 3 ||
-                node.nodeType === 8)) {
-            return;
-        }
-
-        var e, eventType, canContinue;
-
-        if (isString(type)) {
-
-            var hook = eventHooks[type],
-                handler = {};
-
-            if (hook) {
-                handler = hook(handler) || handler;
-            }
-
-            eventType = handler._type || type;
-        } else {
-            return false;
-        }
-        if (msie === 8) {
-            e = node.ownerDocument.createEventObject();
-            e[NODE] = arguments;
-            // handle custom events for legacy IE
-            if (!('on' + eventType in node)) {
-                eventType = customEventType;
-            }
-            // store original event type
-            if (eventType === customEventType) {
-                e.srcUrn = type;
-            }
-
-            node.fireEvent('on' + eventType, e);
-
-            canContinue = e.returnValue !== false;
-        } else {
-            if (~type.indexOf(':')) {
-                e = new CustomEvent(eventType, {
-                    detail: detail,
-                    bubbles: true
-                });
-                e[NODE] = arguments;
+                canContinue = node.dispatchEvent(e);
             } else {
-                e = node.ownerDocument.createEvent('HTMLEvents');
+                e = node.ownerDocument.createEventObject();
                 e[NODE] = arguments;
-                e.initEvent(eventType, true, true);
+                // handle custom events for legacy IE
+                if (!('on' + eventType in node)) {
+                    eventType = customEventType;
+                }
+                // store original event type
+                if (eventType === customEventType) {
+                    e.srcUrn = type;
+                }
+
+                node.fireEvent('on' + eventType, e);
+
+                canContinue = e.returnValue !== false;
             }
 
-            canContinue = node.dispatchEvent(e);
+            // call native function to trigger default behavior
+            if (canContinue && node[type]) {
+
+                // prevent re-triggering of the current event
+                createEventHandler.skip = type;
+
+                magicGuard(node, type);
+
+                createEventHandler.skip = null;
+            }
+
+            return canContinue;
         }
-
-        // call native function to trigger default behavior
-        if (canContinue && node[type]) {
-
-            // prevent re-triggering of the current event
-            createEventHandler.skip = type;
-
-            magicGuard(node, type);
-
-            createEventHandler.skip = null;
-        }
-
-        return canContinue;
-    }
 
     // EventHandler hooks
 
-    if ('onfocusin' in document.documentElement) {
+    if ('onfocusin' in docElem) {
         eventHooks.focus = function(handler) {
             handler._type = 'focusin';
         };
@@ -499,7 +465,7 @@
             handler.capture = true;
         };
     }
-    if (document.createElement('input').validity) {
+    if (doc.createElement('input').validity) {
         eventHooks.invalid = function(handler) {
             handler.capture = true;
         };
@@ -510,7 +476,7 @@
             on: function(node, type, selector, args, callback, once) {
                 node = node.length ? node : [node];
                 node.forEach(function(node) {
-                    _on(node, type, selector, args, callback, once);
+                    add(node, type, selector, args, callback, once);
 
                 });
             },
@@ -521,13 +487,13 @@
             off: function(node, type, selector, callback) {
                 node = node.length ? node : [node];
                 node.forEach(function(node) {
-                    _off(node, type, selector, callback);
+                    removeListener(node, type, selector, callback);
 
                 });
             },
             fire: function(node, type, detail) {
                 node = node.length ? node[0] : node;
-                return _fire(node, type, detail);
+                return trigger(node, type, detail);
 
             },
             eventHooks: eventHooks,
