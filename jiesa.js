@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.7a
+ * Jiesa events api library v 0.0.7b
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
