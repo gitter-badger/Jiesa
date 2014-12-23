@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.4a
+ * Jiesa events api library v 0.0.4b
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -127,6 +127,8 @@
         };
     }
 
+    // fix IE event properties to comply with W3C standards
+
     function fixEvents(name, evt, type, node, target, currentTarget) {
 
             if (typeof name === 'number') {
@@ -161,7 +163,7 @@
                         return evt.returnValue = false;
                     };
                 }
-
+                // stop event propagation
                 if (name === 'stopPropagation') {
                     return function() {
                         return evt.cancelBubble = true;
@@ -171,15 +173,18 @@
             if (name === 'type') {
                 return type;
             }
+            // prevent default action
             if (name === 'defaultPrevented') {
                 return 'defaultPrevented' in evt ?
                     evt.defaultPrevented :
                     // Support: IE < 9, Android < 4.0
                     evt.returnValue === false;
             }
+            // fired element (triggering the event)
             if (name === 'target') {
                 return target;
             }
+            // bound element (listening the event)
             if (name === 'currentTarget') {
                 return currentTarget;
             }
@@ -248,7 +253,7 @@
                     return;
                 }
                 // off callback even if it throws an exception later
-                if (once) {
+                if (once === 1) {
                     _off(node, type, callback);
                 }
 
@@ -324,7 +329,7 @@
                 if (msie === 8) {
                     node.attachEvent('on' + (handler._type || type), handler);
                 } else {
-                    node.addEventListener(handler._type || type, handler, !!handler.bubbling);
+                    node.addEventListener(handler._type || type, handler, !!handler.capture);
                 }
             }
 
@@ -337,7 +342,7 @@
             if (isArray(type)) {
                 type.forEach(function(name) {
                     if (once) {
-                        _once(node, name, selector, args, callback);
+                        _once(node, name, selector, args, callback, true);
                     } else {
                         _on(node, name, selector, args, callback);
                     }
@@ -350,7 +355,7 @@
                 }
                 Object.keys(type).forEach(function(name) {
                     if (once) {
-                        _once(node, name, selector, args, type[name]);
+                        _once(node, name, selector, args, type[name], true);
                     } else {
                         _on(node, name, selector, args, type[name]);
                     }
@@ -359,29 +364,30 @@
         }
     }
 
-    function _once(node, type, selector, args, callback) {
-        return _on(node, type, selector, args, callback, 1);
-    }
+    // Helper function
 
-    /**
-     * Remove event to element.
-     * Using removeEventListener or detachEvent (IE8)
-     */
+    function _once(node, type, selector, args, callback) {
+            return _on(node, type, selector, args, callback, 1);
+        }
+        /**
+         * Remove event to element.
+         * Using removeEventListener or detachEvent (IE8)
+         */
 
     function _off(node, type, selector, callback) {
 
+        if (node === undefined || !node[EVENT] || !isString(type)) {
+            return;
+        }
         if (callback === void 0 && selector !== void 0) {
             callback = selector;
             selector = void 0;
         }
 
-        node[EVENT].forEach(function(handler, index, events) {
+        node[EVENT].filter(function(handler) {
 
             var skip = type !== handler.type;
 
-            if (!callback) {
-                callback = handler.callback;
-            }
             skip = skip || selector && selector !== handler.selector;
             skip = skip || callback && callback !== handler.callback;
 
@@ -393,7 +399,7 @@
             if (msie === 8) {
                 node.detachEvent('on' + type, handler);
             } else {
-                node.removeEventListener(type, handler, !!handler.bubbling);
+                node.removeEventListener(type, handler, !!handler.capture);
             }
         });
         return this;
@@ -477,21 +483,40 @@
     } else {
         // firefox doesn't support focusin/focusout events
         eventHooks.focus = eventHooks.blur = function(handler) {
-            handler.bubbling = true;
+            handler.capture = true;
         };
     }
     if (document.createElement('input').validity) {
         eventHooks.invalid = function(handler) {
-            handler.bubbling = true;
+            handler.capture = true;
         };
     }
 
     var _Jiesa = window.Jiesa,
         Jiesa = {
-            on: _on,
-            once: _once,
-            off: _off,
-            fire: _fire,
+            on: function(node, type, selector, args, callback, once) {
+                node = node.length ? node : [node];
+                node.forEach(function(node) {
+                    _on(node, type, selector, args, callback, once);
+
+                })
+            },
+            once: function(node, type, selector, args, callback) {
+                return this.on(node, type, selector, args, callback, 1);
+            },
+
+            off: function(node, type, selector, callback) {
+                node = node.length ? node : [node];
+                node.forEach(function(node) {
+                    _off(node, type, selector, callback);
+
+                });
+            },
+            fire: function(node, type, detail) {
+                node = node.length ? node[0] : node;
+                return _fire(node, type, detail);
+
+            },
             eventHooks: eventHooks,
             noConflict: function() {
                 if (window.Jiesa === Jiesa) {
