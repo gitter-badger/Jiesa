@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.8a
+ * Jiesa events api library v 0.0.8b
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -82,7 +82,12 @@
 
         // A container 'hook' for special event types
 
-        eventHooks = {},
+        eventHooks = {
+            // Normalize mousewheel for older Firefox 
+            'mousewheel': function(handler) {
+                handler._type = typeof InstallTrigger !== void 0 ? 'DOMMouseScroll' : 'mousewheel';
+            }
+        },
 
         // Detects XML nodes
 
@@ -99,7 +104,6 @@
         qsaBugs = (function() {
 
             var buggy = [],
-                selected,
                 id = 'jiesa_unique',
                 whitespace = "[\\x20\\t\\r\\n\\f]",
                 booleans = 'checked|selected|async|autofocus|autoplay|controls|defer|disabled|hidden|ismap|loop|multiple|open|readonly|required|scoped',
@@ -613,6 +617,7 @@
             return canContinue;
         };
 
+
     // EventHandler hooks
 
     if ('onfocusin' in docElem) {
@@ -632,6 +637,91 @@
         eventHooks.invalid = function(handler) {
             handler.capture = true;
         };
+    }
+
+    // NON-W3C support
+
+    if (!W3C_MODEL) {
+
+        var msie = document.documentMode,
+            ie9 = msie === 9,
+            ie8 = msie === 8,
+            FormButton = RegExp('^(reset|submit)$'),
+            FormTextbox = RegExp('^(textarea|text|password|file)$');
+
+        // onkeydown on form elements
+
+        document.attachEvent('onkeydown', function() {
+            var evt = window.event,
+                target = evt.srcElement,
+                type = target.type;
+            if (FormTextbox.test(type) &&
+                target.form &&
+                evt.keyCode === 13 &&
+                evt.returnValue !== false) {
+                trigger(target.form, 'submit');
+                return false;
+            }
+        });
+
+        document.attachEvent('onclick', function() {
+            var target = window.event.srcElement,
+                type = target.type;
+            // html form elements only
+            if (FormButton.test(type) && target.form) {
+                trigger(target.form, type);
+            }
+        });
+        var inputEventHandler = function() {
+                if (srcNode && srcNode.value !== srcNodeValue) {
+                    srcNodeValue = srcNode.value;
+                    // trigger custom event that bubbles
+                    trigger(srcNode, 'input');
+                }
+            },
+            clickEventHandler = function() {
+                if (srcNode && srcNode.checked !== srcNodeValue) {
+                    srcNodeValue = srcNode.checked;
+                    trigger(srcNode, 'change');
+                }
+            },
+            changeEventHandler = function() {
+                trigger(srcNode, 'change');
+            },
+            srcNode, srcNodeValue;
+
+        if (ie9) {
+            document.attachEvent('onselectionchange', inputEventHandler);
+        }
+
+        // input event fix via propertychange
+        document.attachEvent('onfocusin', function() {
+            if (srcNode && ie8) {
+                srcNode.detachEvent('onclick', clickEventHandler);
+                srcNode.detachEvent('onchange', changeEventHandler);
+                srcNode.detachEvent('onpropertychange', inputEventHandler);
+            }
+
+            srcNode = window.event.srcElement;
+            srcNodeValue = srcNode.value;
+
+            if (ie8) {
+                var type = srcNode.type;
+
+                if (type === 'checkbox' || type === 'radio') {
+                    srcNode.attachEvent('onclick', clickEventHandler);
+                    srcNodeValue = srcNode.checked;
+                } else if (srcNode.nodeType === 1) {
+                    srcNode.attachEvent('onchange', changeEventHandler);
+
+                    if (type === 'text' ||
+                        type === 'password' ||
+                        type === 'textarea') {
+                        srcNode.attachEvent('onpropertychange', inputEventHandler);
+                    }
+                }
+            }
+        });
     }
 
     var _Jiesa = win.Jiesa,

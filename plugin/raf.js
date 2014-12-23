@@ -102,12 +102,12 @@
 
    // EventHandler hooks
 
-    ['scroll', 'mousemove'].forEach(function(name) {
+    ['resize', 'touchmove', 'mousewheel', 'scroll', 'mousemove'].forEach(function(name) {
         Jiesa.eventHooks[name] = function(handler) {
             var isRunning = true;
-            return function(e) { alert(e)
+            return function(e) { 
                 if (isRunning) {
-                    isRunning = raf(function() {
+                    isRunning = raf(function(a) {
                         isRunning = !handler(e);
                     });
                 }
