@@ -45,6 +45,43 @@
             return documentElement ? documentElement.nodeName !== 'HTML' : false;
         },
 
+        // Check for querySelectorAll browser support
+
+        supportQSA = rnative.test(docElem.querySelectorAll),
+
+        qsaBugs = (function() {
+
+            var buggy = false,
+                selected,
+                div = document.createElement('div');
+
+            // IE 8 returns closed nodes (EG:"</foo>") for querySelectorAll('*') for some documents
+
+            div.innerHTML = 'foo</foo>';
+            selected = div.querySelectorAll('*');
+            if ((selected && !!selected.length && selected[0].nodeName.charAt(0) == '/')) {
+                buggy = true;
+            }
+
+            // Webkit and Opera dont return selected options on querySelectorAll
+
+            div.innerHTML = '<select><option selected="selected">a</option></select>';
+            if (div.querySelectorAll(':checked').length == 0) {
+                buggy = true;
+            }
+
+            // IE returns incorrect results for attr[*^$]="" selectors on querySelectorAll
+            div.innerHTML = '<a class=""></a>';
+            if (div.querySelectorAll('[class*=""]').length != 0) {
+                buggy = true;
+            }
+
+            // release memory in IE
+            div = null;
+            return buggy;
+
+        }()),
+
         // Marker for native QSA
 
         usaQSA = true,
@@ -55,11 +92,11 @@
 
         setSelectorEngine = function(e) {
             if (!arguments.length) {
-                selectorEngine = doc.querySelectorAll ? function(s, r) {
-                    return r.querySelectorAll(s);
+                selectorEngine = supportQSA && !qsaBugs && doc.querySelectorAll ? function(selector, context) {
+                    return context.querySelectorAll(selector);
                 } : function() {
                     throw new Error('Jiesa: No selector engine installed');
-                }
+                };
             } else {
                 // Mark that we are no longer QSA
                 usaQSA = false;
@@ -196,6 +233,7 @@
             // fired element (triggering the event)
             if (name === 'target') {
                 return target;
+
             }
             // bound element (listening the event)
             if (name === 'currentTarget') {
@@ -234,9 +272,8 @@
                 return false;
             }
         },
-        /**
-         * Create event handler
-         */
+
+        // Create event handler
 
         createEventHandler = function(type, selector, callback, props, node, once) {
 
