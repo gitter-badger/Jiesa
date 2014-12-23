@@ -19,7 +19,7 @@
         customEventType = 'ie8Custom',
         NODE = '[[__node__]]',
         EVENT = '[[__event__]]',
-        
+
         rnative = /^[^{]+\{\s*\[native \w/,
         collectionCbRegEx = /callback\.call\(([^)]+)\)/g,
 
@@ -99,6 +99,7 @@
         qsaBugs = (function() {
 
             var buggy = [],
+                selected,
                 id = 'jiesa_unique',
                 whitespace = "[\\x20\\t\\r\\n\\f]",
                 booleans = 'checked|selected|async|autofocus|autoplay|controls|defer|disabled|hidden|ismap|loop|multiple|open|readonly|required|scoped',
@@ -188,8 +189,9 @@
             return ret;
         }()),
 
-        // matchesSelector for delegated events. It's using matchesSelector if it exists
-        // with fallback to querySelectorAll for older browsers (e.g. IE8, Opera 12.x) 
+        // Jiesa matchesSelector for delegated events. It's using matchesSelector if it exists
+        // with fallback to querySelectorAll for older browsers (e.g. IE8, Opera 12.x) OR end-devs
+        // selector engine if installed (it will overwrte native QSA fallback)
 
         JiesaMatches = function(selector, context) {
 
@@ -202,20 +204,25 @@
                 var n, res, found, index, length;
 
                 if (!supportMatchesSelector || (supportMatchesSelector && isXML(doc))) {
-                    // querySelectorAll are not supported on XML documents
+
+                    // QSA are not supported on XML documents, so let Jiesa throw if XML doc,
+                    // or QSA are buggy
+
                     if (useQSA && (qsaBugs.test(selector) || isXML(doc))) {
                         throw new Error('Jiesa: This version of querySelectorAll (QSA) are not supported.');
                     }
                     found = selectorEngine(selector, (context || node.ownerDocument));
                 }
 
+                // Disconnected nodes are said to be in a document
+                // fragment in IE 9, so we avoid it if we make sure the 
+                // node always have a nodeType of value 1
+
                 for (; node && node.nodeType === 1; node = node.parentNode) {
+
                     if (supportMatchesSelector &&
                         // IE 9's matchesSelector returns false on disconnected nodes
-                        (disconnectedNodes ||
-                            // As well, disconnected nodes are said to be in a document
-                            // fragment in IE 9
-                            node.document && node.document.nodeType !== 11)) {
+                        disconnectedNodes) {
                         res = matchesSelector.call(node, selector);
                     } else {
                         index = 0;
@@ -239,11 +246,11 @@
             };
         },
 
-        // clean up buggy and fix event properties to comply with W3C standards, before returning those 
+        // fix event properties to comply with W3C standards, before returning those 
         // events who are requested by the end-developer by taking the actual DOM event object 
-        // and filter by user request.
+        // and filter by request.
 
-        fixEvents = function(name, evt, type, node, target, currentTarget) {
+        fixEvents = function(node, name, evt, type, target, currentTarget) {
 
             if (isNumber(name)) {
                 var args = evt[NODE];
@@ -381,8 +388,7 @@
 
                     if (props) {
                         args = map(args, function(name) {
-                            return fixEvents(
-                                name, evt, type, node, target, currentTarget);
+                            return fixEvents(node, name, evt, type, target, currentTarget);
                         });
                     } else {
                         args = Array.prototype.slice.call(evt[NODE] || [0], 1);
@@ -430,7 +436,7 @@
             if (!node[EVENT]) {
                 node[EVENT] = [];
             }
-            if (typeof type === 'string') {
+            if (isString(type)) {
 
                 if (isFunction(args)) {
 
@@ -480,7 +486,7 @@
                     });
                 } else {
 
-                    if (args === undefined && isArray(selector)) {
+                    if (args === void 0 && isArray(selector)) {
                         args = selector;
                         selector = void 0;
                     }
@@ -505,10 +511,10 @@
 
         removeListener = function(node, type, selector, callback) {
 
-            if (node === undefined || !node[EVENT] || !isString(type)) {
+            if (node === void 0 || !node[EVENT] || !isString(type)) {
                 return;
-
             }
+
             if (callback === void 0 && selector !== void 0) {
                 callback = selector;
                 selector = void 0;
