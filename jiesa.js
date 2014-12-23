@@ -51,40 +51,52 @@
 
         qsaBugs = (function() {
 
-            var buggy = false,
+            var buggy = [],
                 selected,
+                id = 'jiesa_unique',
+                whitespace = "[\\x20\\t\\r\\n\\f]",
+                booleans = 'checked|selected|async|autofocus|autoplay|controls|defer|disabled|hidden|ismap|loop|multiple|open|readonly|required|scoped',
                 div = document.createElement('div');
 
-            // IE 8 returns closed nodes (EG:"</foo>") for querySelectorAll('*') for some documents
+            docElem.appendChild(div).innerHTML = "<a id='" + id + "'></a>" +
+                "<select id='" + id + "-\f]' msallowcapture=''>" +
+                "<option selected=''></option></select>";
 
-            div.innerHTML = 'foo</foo>';
-            selected = div.querySelectorAll('*');
-            if ((selected && !!selected.length && selected[0].nodeName.charAt(0) == '/')) {
-                buggy = true;
+            // Support: IE8, Opera 11-12.16
+            if (div.querySelectorAll("[msallowcapture^='']").length) {
+                rbuggyQSA.push("[*^$]=" + whitespace + "*(?:''|\"\")");
             }
 
-            // Webkit and Opera dont return selected options on querySelectorAll
-
-            div.innerHTML = '<select><option selected="selected">a</option></select>';
-            if (div.querySelectorAll(':checked').length == 0) {
-                buggy = true;
+            // Support: IE8
+            if (!div.querySelectorAll("[selected]").length) {
+                buggy.push("\\[" + whitespace + "*(?:value|" + booleans + ")");
             }
 
-            // IE returns incorrect results for attr[*^$]="" selectors on querySelectorAll
-            div.innerHTML = '<a class=""></a>';
-            if (div.querySelectorAll('[class*=""]').length != 0) {
-                buggy = true;
+            // Webkit/Opera - :checked should return selected option elements
+            // http://www.w3.org/TR/2011/REC-css3-selectors-20110929/#checked
+            // IE8 throws error here and will not see later tests
+            if (!div.querySelectorAll(":checked").length) {
+                buggy.push(":checked");
             }
 
+            // Support: Chrome<29, Android<4.2+, Safari<7.0+, iOS<7.0+, PhantomJS<1.9.7+
+            if (!div.querySelectorAll("[id~=" + id + "-]").length) {
+                buggy.push("~=");
+            }
+            // Support: Safari 8+, iOS 8+
+            if (!div.querySelectorAll("a#" + id + "+*").length) {
+                buggy.push(".#.+[+~]");
+            }
             // release memory in IE
             div = null;
-            return buggy;
+
+            return buggy.length && new RegExp(buggy.join("|"));
 
         }()),
 
         // Marker for native QSA
 
-        usaQSA = true,
+        useQSA = true,
 
         // selector engine for delegated events, use querySelectorAll if it exists
 
@@ -98,8 +110,9 @@
                     throw new Error('Jiesa: No selector engine installed');
                 };
             } else {
-                // Mark that we are no longer QSA
-                usaQSA = false;
+                // Mark that we are no longer using QSA as the
+                // default fallback selector engine
+                useQSA = false;
                 // Set another selector engine
                 selectorEngine = e;
             }
@@ -140,7 +153,7 @@
 
                 if (!supportMatchesSelector || (supportMatchesSelector && isXML(doc))) {
                     // querySelectorAll are not supported on XML documents
-                    if (usaQSA && isXML(doc)) {
+                    if (useQSA && isXML(doc)) {
                         throw new Error('Jiesa: XML documents are not supported by this selector engine');
                     }
                     found = selectorEngine(selector, (context || node.ownerDocument));
