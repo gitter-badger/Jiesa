@@ -164,6 +164,18 @@ Jiesa.fire(element, 'click');
 Jiesa.fire(element, "jiesa:event", {a: "b"}, 123); // fire "jiesa:event" with arguments
 ```
 
+#Event delegation
+
+**Jiesa** supports event delegation by going up in the DOM tree, calling matchesSelector once per level. 
+
+Still *matchesSelector* is a bleeding edge feature, and the fact it will not allways work as expected, **Jiesa** allows you to set a default selector engine as a fallback for matchesSelector. And overwrite the default **querySelectorAll** that **Jiesa** uses as a fallback for older browsers that doesn't support *matchesSelector*. 
+
+The selector engine simply needs to be a function that takes two arguments: a selector string and a root element, it should return an array of matched DOM elements. Here is how you do it:
+
+```javascript 
+Jiesa.setSelectorEngine(Sizzle);
+```
+
 #Browser support
 
 All browsers, included **Internet Explorer 8**
