@@ -1,5 +1,5 @@
 /*!
- * Jiesa events api library v 0.0.6a
+ * Jiesa events api library v 0.0.6c
  *
  * Copyright 2014, 2015 K.F and other contributors
  * Released under the MIT license
@@ -34,7 +34,7 @@
             return Object.prototype.toString.call(obj) === '[object Array]';
         },
 
-        // Container for special event types
+        // A container 'hook' for special event types
 
         eventHooks = {},
 
@@ -50,10 +50,10 @@
 
         supportMatchesSelector = rnative.test(matchesSelector),
 
-        // selector matches for delegated events, use matchesSelector if it exists
-        // with fallback to querySelectorAll for older browsers
+        // selectorEngine for delegated events. It's using matchesSelector if it exists
+        // with fallback to querySelectorAll for older browsers (e.g. IE8, Opera 12.x) 
 
-        selectormatcher = function(selector, context) {
+        selectorEngine = function(selector, context) {
 
             if (!isString(selector)) return null;
 
@@ -104,6 +104,10 @@
             // Support: IE8
             if (!W3C_MODEL) {
                 var docEl = node.ownerDocument.documentElement;
+
+                if (name === 'rightClick') {
+                    return evt.keyCode === 3 || evt.button === 2;
+                }
 
                 if (name === 'which') {
                     return evt.keyCode;
@@ -179,7 +183,7 @@
             try {
                 return fn.call(context, arg1, arg2);
             } catch (err) {
-                window.setTimeout(function() {
+                win.setTimeout(function() {
                     throw err;
                 }, 1);
 
@@ -192,11 +196,14 @@
 
         createEventHandler = function(type, selector, callback, props, node, once) {
 
-            var hook = eventHooks[type],
-                matcher = selectormatcher(selector, node),
+            var matcher = selectorEngine(selector, node),
+                hook = eventHooks[type],
                 handler = function(evt) {
 
-                    evt = evt || window.event;
+                    // Support: IE8 +
+
+                    evt = evt || ((node.ownerDocument || node.document || node).parentWindow || win).event;
+
                     // early stop in case of default action
 
                     if (createEventHandler.skip === type) {
@@ -211,10 +218,7 @@
                         currentTarget = matcher && target.nodeType === 1 &&
                         // Don't process clicks on disabled elements
                         (target.disabled !== true || event.type !== 'click') ? matcher(target) : node,
-
-                        // Expose a few default events
-
-                        args = props || [selector ? 'currentTarget' : 'target', 'defaultPrevented'];
+                        args = props || [];
 
                     // return if the target doesn't match selector
                     if (!currentTarget) {
@@ -230,7 +234,11 @@
                             return fixEvents(
                                 name, evt, type, node, target, currentTarget);
                         });
+                    } else {
+                        args = Array.prototype.slice.call(evt[NODE] || [0], 1);
                     }
+
+                    if (!type) return;
 
                     // prevent default if handler returns false
                     if (callback.apply(node, args) === false) {
@@ -341,13 +349,11 @@
 
         temp = function(node, type, selector, args, callback) {
             return add(node, type, selector, args, callback, 1);
-        }
-        /**
-         * Remove event to element.
-         * Using removeEventListener or detachEvent (IE8)
-         */
+        },
 
-    removeListener = function(node, type, selector, callback) {
+        // Add and remove listeners to DOM elements
+
+        removeListener = function(node, type, selector, callback) {
 
             if (node === undefined || !node[EVENT] || !isString(type)) {
                 return;
@@ -448,7 +454,7 @@
             }
 
             return canContinue;
-        }
+        };
 
     // EventHandler hooks
 
@@ -471,7 +477,7 @@
         };
     }
 
-    var _Jiesa = window.Jiesa,
+    var _Jiesa = win.Jiesa,
         Jiesa = {
             on: function(node, type, selector, args, callback, once) {
                 node = node.length ? node : [node];
@@ -498,14 +504,14 @@
             },
             eventHooks: eventHooks,
             noConflict: function() {
-                if (window.Jiesa === Jiesa) {
-                    window.Jiesa = _Jiesa;
+                if (win.Jiesa === Jiesa) {
+                    win.Jiesa = _Jiesa;
                 }
 
                 return Jiesa;
             }
         };
 
-    window.Jiesa = Jiesa;
+    win.Jiesa = Jiesa;
 
 }(window));
