@@ -61,7 +61,9 @@
                     throw new Error('Jiesa: No selector engine installed');
                 }
             } else {
-                qsa = false;
+                // Mark that we are no longer QSA
+                usaQSA = false;
+                // Set another selector engine
                 selectorEngine = e;
             }
         },
